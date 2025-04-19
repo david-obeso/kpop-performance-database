@@ -1,0 +1,16 @@
+# Virtual environment
+venv/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Excel files
+*.xlsm
+*.xlsx
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
