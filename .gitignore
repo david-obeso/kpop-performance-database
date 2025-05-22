@@ -14,3 +14,6 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
+
+# ignore vscode settings
+.vscode/
