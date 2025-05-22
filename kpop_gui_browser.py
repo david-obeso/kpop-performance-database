@@ -47,10 +47,36 @@ class KpopDBBrowser(tk.Tk):
         search_entry.bind("<KeyRelease>", lambda e: self.update_list())
         ttk.Button(filter_frame, text="Clear", command=self.clear_search).pack(side="left")
 
-        # --- Results List ---
-        self.listbox = tk.Listbox(self, font=("Arial", 12))
-        self.listbox.pack(fill="both", expand=True, padx=10, pady=5)
+        # --- Column Headers ---
+        header_text = (
+            f"{'Date':<12} | {'Group':<35} | {'Show':<25} | {'Res':<8} | {'Score':<4} | {'Notes':<20} | {'Path'}"
+        )
+        header = tk.Label(self, text=header_text, font=("Courier New", 11, "bold"), anchor="w")
+        header.pack(fill="x", padx=10, pady=(5,0))
+
+        # --- Results List with Scrollbars ---
+        listbox_frame = tk.Frame(self)
+        listbox_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # Vertical scrollbar
+        vscroll = tk.Scrollbar(listbox_frame, orient="vertical")
+        vscroll.pack(side="right", fill="y")
+
+        # Horizontal scrollbar
+        hscroll = tk.Scrollbar(listbox_frame, orient="horizontal")
+        hscroll.pack(side="bottom", fill="x")
+
+        self.listbox = tk.Listbox(
+            listbox_frame,
+            font=("Courier New", 11),
+            yscrollcommand=vscroll.set,
+            xscrollcommand=hscroll.set,
+        )
+        self.listbox.pack(side="left", fill="both", expand=True)
         self.listbox.bind("<Double-Button-1>", lambda e: self.play_selected())
+
+        vscroll.config(command=self.listbox.yview)
+        hscroll.config(command=self.listbox.xview)
 
         # Play button
         play_btn = ttk.Button(self, text="Play Selected", command=self.play_selected)
@@ -103,7 +129,13 @@ class KpopDBBrowser(tk.Tk):
             # perf: (id, group, date, show, res, path, score, notes)
             group = perf[1] or ""
             date = perf[2] or ""
-            display = f"{date} | {group} | {perf[3]} | {perf[4]} | {perf[6]} | {perf[7]} | {perf[5]}"
+            show = perf[3] or ""
+            res = perf[4] or ""
+            score = str(perf[6]) if perf[6] is not None else ""
+            notes = perf[7] or ""
+            path = perf[5] or ""
+            # Adjust field widths as needed for your data
+            display = f"{date:<12} | {group:<35} | {show:<25} | {res:<8} | {score:<4} | {notes:<20} | {path}"
             # Apply filters
             if group_filter and group_filter != group.lower():
                 continue
@@ -125,6 +157,9 @@ class KpopDBBrowser(tk.Tk):
         if not file_path or not os.path.exists(file_path):
             messagebox.showerror("File not found", f"The file does not exist:\n{file_path}")
             return
+        # Show waiting message before launching player
+        self.status_var.set("Waking up external drive, please wait...")
+        self.update_idletasks()  # Force update of the status bar
         try:
             subprocess.Popen([MPV_PLAYER_PATH, file_path])
             self.status_var.set(f"Playing: {file_path}")
