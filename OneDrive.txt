@@ -17,11 +17,11 @@ In this file, I've listed KpopDatabase_2.1.xlsm. This tells the client:
 Only download/sync this specific file (and any folders needed to reach it if it's nested on OneDrive).
 If other files/folders exist in /home/david/Documents directory that were previously synced from OneDrive but are not in sync_list, they will be deleted locally during a resync or normal sync to make the local directory match the sync_list criteria. They remain on OneDrive.
 Performed an Initial Resynchronization: I just successfully ran /usr/local/bin/onedrive --sync --resync. This was crucial because:
-It told the client to discard any old ideas it had about your synced files.
+It told the client to discard any old ideas it had about synced files.
 It forced it to re-read the config and sync_list.
 It then scanned my entire OneDrive online, compared it to my sync_list, and built a fresh local "map" of what needs to be synced, downloading KpopDatabase_2.1.xlsm into /home/david/Documents.
 2. How to Sync the Files (Common Commands):
-Remember to run these commands from the terminal. You can be in any directory when you run them, as the client knows where your sync_dir is from the config.
+Remember to run these commands from the terminal, from any directory since the client knows where the sync_dir is from the config.
 A. One-Time Sync (For the moment I will NOT use this option):
 Command: /usr/local/bin/onedrive --sync
 What it does:
