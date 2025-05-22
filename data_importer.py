@@ -5,7 +5,7 @@ from sqlite3 import Error # <--- Import the Error class for better error handlin
 import re # Import regular expression module for path conversion
 
 # --- Configuration ---
-EXCEL_FILE_PATH = "/home/david/Documents/KpopDatabase_2.1.xlsm" # The path to the Excel file
+EXCEL_FILE_PATH = "/home/david/kpop-performance-database/KpopDatabase_2.1.xlsm" # The path to the Excel file
 
 PERFORMANCES_SHEET_NAME = "TV Performances" # The exact name of the sheet in the Excel file
 
