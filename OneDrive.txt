@@ -1,24 +1,28 @@
-Command to use: /usr/local/bin/onedrive --sync --download-only
+IMPORTANT!!!
+Command to use to update the excel file from OneDrive: /usr/local/bin/onedrive --sync --download-only
+It is necessary to modify the file /home/david/.config/onedrive/sync_list if I change the name of the excel file I use to update the database
+...
+
 My OneDrive Client Setup on Linux (using abraunegg/onedrive)
-1. What You've Done (The Setup Process):
-Installed the Client: You've installed the onedrive client for Linux, specifically the one developed by abraunegg (from GitHub: https://github.com/abraunegg/onedrive). This is a powerful and well-maintained command-line client.
-Initial Authorization: You would have run onedrive once without arguments (or with --resync for the very first time) and followed a link to authorize the application with your Microsoft account, then pasted the response URI back into the terminal.
+1. What I've Done (The Setup Process):
+Installed the Client: I've installed the onedrive client for Linux, specifically the one developed by abraunegg (from GitHub: https://github.com/abraunegg/onedrive). This is a powerful and well-maintained command-line client.
+Initial Authorization: I have run onedrive once without arguments (or with --resync for the very first time) and followed a link to authorize the application with my Microsoft account, then pasted the response URI back into the terminal.
 Configured the Client:
-You created/edited the main configuration file: /home/david/.config/onedrive/config
-In this file, you've set:
-sync_dir = "/home/david/Documents": This tells the client that your local OneDrive folder (where files will be downloaded to and uploaded from) is /home/david/Documents.
-monitor_interval = "300": This means if you use the --monitor mode, the client will check for changes every 300 seconds (5 minutes).
-You created a selective sync file: /home/david/.config/onedrive/sync_list
-In this file, you've listed KpopDatabase_2.1.xlsm. This tells the client:
+I created the main configuration file: /home/david/.config/onedrive/config
+In this file, I've set:
+sync_dir = "/home/david/Documents": This tells the client that my local OneDrive folder (where files will be downloaded to and uploaded from) is /home/david/Documents.
+monitor_interval = "300": This means if I use the --monitor mode, the client will check for changes every 300 seconds (5 minutes).
+I created a selective sync file: /home/david/.config/onedrive/sync_list
+In this file, I've listed KpopDatabase_2.1.xlsm. This tells the client:
 Only download/sync this specific file (and any folders needed to reach it if it's nested on OneDrive).
-If other files/folders exist in your /home/david/Documents directory that were previously synced from OneDrive but are not in sync_list, they will be deleted locally during a resync or normal sync to make the local directory match the sync_list criteria. They remain on OneDrive.
-Performed an Initial Resynchronization: You just successfully ran /usr/local/bin/onedrive --sync --resync (or --synchronize --resync). This was crucial because:
+If other files/folders exist in /home/david/Documents directory that were previously synced from OneDrive but are not in sync_list, they will be deleted locally during a resync or normal sync to make the local directory match the sync_list criteria. They remain on OneDrive.
+Performed an Initial Resynchronization: I just successfully ran /usr/local/bin/onedrive --sync --resync. This was crucial because:
 It told the client to discard any old ideas it had about your synced files.
-It forced it to re-read your config and sync_list.
-It then scanned your entire OneDrive online, compared it to your sync_list, and built a fresh local "map" of what needs to be synced, downloading KpopDatabase_2.1.xlsm into /home/david/Documents.
-2. How to Sync Your Files (Common Commands):
-Remember to run these commands from your terminal. You can be in any directory when you run them, as the client knows where your sync_dir is from the config.
-A. One-Time Sync (Recommended for most manual syncs):
+It forced it to re-read the config and sync_list.
+It then scanned my entire OneDrive online, compared it to my sync_list, and built a fresh local "map" of what needs to be synced, downloading KpopDatabase_2.1.xlsm into /home/david/Documents.
+2. How to Sync the Files (Common Commands):
+Remember to run these commands from the terminal. You can be in any directory when you run them, as the client knows where your sync_dir is from the config.
+A. One-Time Sync (For the moment I will NOT use this option):
 Command: /usr/local/bin/onedrive --sync
 What it does:
 Checks for changes on OneDrive (for files in your sync_list).
@@ -27,12 +31,12 @@ Checks for local changes in /home/david/Documents (for files in your sync_list).
 Uploads any new or updated local files to OneDrive.
 Deletes local files if they were removed from OneDrive (and were in sync_list).
 Deletes remote files if they were deleted locally (and were in sync_list) unless you configure sync_dir_permissions or other flags to prevent this. (Default is two-way sync).
-B. One-Time Sync (Download-Only):
+B. One-Time Sync (Download-Only)(THIS IS MY PREFERRED OPTION):
 Command: /usr/local/bin/onedrive --sync --download-only
 What it does:
-Checks for changes on OneDrive (for files in your sync_list).
+Checks for changes on OneDrive (for files in my sync_list).
 Downloads any new or updated files from OneDrive to /home/david/Documents.
-It will NOT upload any local changes you've made. This is useful if you only want to fetch from the cloud.
+It will NOT upload any local changes I've made. This is useful because I only want to fetch from the cloud.
 C. Continuous Sync (Monitor Mode - "Set it and Forget it"):
 Command: /usr/local/bin/onedrive --monitor
 What it does:
@@ -41,15 +45,10 @@ It then runs in the background (or foreground, keeping your terminal busy unless
 Every monitor_interval seconds (300 seconds / 5 minutes for you), it automatically checks for changes and syncs them (both downloads and uploads, according to your sync_list).
 To stop it: If it's running in the foreground, press Ctrl+C in the terminal. If you backgrounded it, you'd need to find its process ID (ps aux | grep onedrive) and use kill <PID>.
 3. Important Reminders & Troubleshooting:
-sync_list is Key: If you're using sync_list, only the items in that file will be present in your /home/david/Documents directory after a sync. If you want to sync more items, add them to the sync_list file (one item per line). If you want to sync everything, delete or rename the sync_list file.
+sync_list is Key: Since I am using sync_list, only the items in that file will be present in my /home/david/Documents directory after a sync. If you want to sync more items, add them to the sync_list file (one item per line). If you want to sync everything, delete or rename the sync_list file.
 Changes to config or sync_list Usage:
 If you change sync_dir in your config.
 If you start using sync_list (i.e., create the file when it wasn't there before).
 If you stop using sync_list (i.e., delete or rename the file).
 You MUST run /usr/local/bin/onedrive --sync --resync again. This tells the client to rebuild its understanding based on the new rules.
 Minor changes inside sync_list (adding/removing a file path) usually don't require a full --resync; a simple --sync should pick up the changes.
-File Locked Error (HTTP 423):
-As you saw, this means the file is locked on OneDrive's servers, usually because it's open in an application (like Excel) on another computer or in your web browser (Excel Online).
-Solution: Close the file everywhere else, wait a few minutes, then try syncing again.
-Configuration Files Location: /home/david/.config/onedrive/ (this is where config and sync_list live).
-Getting Help: /usr/local/bin/onedrive --help will show you all available commands and options.
