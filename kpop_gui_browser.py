@@ -1,17 +1,42 @@
 import os
 import subprocess
 import sqlite3
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-DATABASE_FILE = "kpop_music.db"
+DATABASE_FILE = "kpop_database.db"
 MPV_PLAYER_PATH = "mpv"
+
+DARK_BG = "#222222"
+BRIGHT_FG = "#f8f8f2"
+ACCENT = "#44475a"
+FONT_MAIN = ("Courier New", 13)
+FONT_HEADER = ("Courier New", 13, "bold")
+FONT_STATUS = ("Arial", 13)
+FONT_BUTTON = ("Arial", 13, "bold")
 
 class KpopDBBrowser(tk.Tk):
     def __init__(self):
+        # Mount Windows shares before anything else
+        try:
+            self.status_message = "Mounting Windows shares, please enter your password if prompted..."
+            print(self.status_message)
+            subprocess.run(
+                ["/home/david/mount_windows_shares.sh"],
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            tk.messagebox.showerror(
+                "Mount Error",
+                f"Could not mount Windows shares!\n\nError: {e}\n\nThe program will now exit."
+            )
+            sys.exit(1)
+
         super().__init__()
         self.title("K-Pop Performance Database Browser")
-        self.geometry("1100x650")
+        self.geometry("2100x900")
+        self.configure(bg=DARK_BG)
         self.conn = sqlite3.connect(DATABASE_FILE)
         self.performances = []
         self.filtered = []
@@ -21,56 +46,105 @@ class KpopDBBrowser(tk.Tk):
         self.load_performances()
 
     def create_widgets(self):
+        style = ttk.Style(self)
+        style.theme_use("clam")
+        style.configure("TFrame", background=DARK_BG)
+        style.configure("TLabel", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN)
+        style.configure("TButton", background=ACCENT, foreground=BRIGHT_FG, font=FONT_BUTTON)
+        style.configure("TCombobox", fieldbackground=DARK_BG, background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN)
+        style.map("TButton", background=[("active", "#6272a4")])
+
         # --- Filter Frame ---
         filter_frame = ttk.Frame(self)
-        filter_frame.pack(fill="x", padx=10, pady=5)
+        filter_frame.pack(fill="x", padx=10, pady=8)
 
         # Group dropdown
         ttk.Label(filter_frame, text="Group:").pack(side="left")
         self.group_var = tk.StringVar()
-        self.group_dropdown = ttk.Combobox(filter_frame, textvariable=self.group_var, state="readonly")
-        self.group_dropdown.pack(side="left", padx=5)
+        # Custom style for Combobox
+        style.configure(
+            "Custom.TCombobox",
+            fieldbackground="#333a40",  # Entry field background
+            background="#333a40",       # Dropdown background
+            foreground=BRIGHT_FG,
+            font=("Courier New", 14, "bold"),
+            selectbackground="#44475a",
+            selectforeground=BRIGHT_FG,
+        )
+        self.group_dropdown = ttk.Combobox(
+            filter_frame,
+            textvariable=self.group_var,
+            state="readonly",
+            font=("Courier New", 16, "bold"),
+            style="Custom.TCombobox",
+            width=10  
+        )
+        self.group_dropdown.pack(side="left", padx=5, ipadx=5, ipady=6)
         self.group_dropdown.bind("<<ComboboxSelected>>", lambda e: self.update_list())
 
         # Date entry
         ttk.Label(filter_frame, text="Date (YYYY or YYYY-MM):").pack(side="left", padx=(20,0))
         self.date_var = tk.StringVar()
-        date_entry = ttk.Entry(filter_frame, textvariable=self.date_var, width=12)
-        date_entry.pack(side="left", padx=5)
+        date_entry = tk.Entry(filter_frame, textvariable=self.date_var, width=14, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, insertbackground=BRIGHT_FG)
+        date_entry.pack(side="left", padx=5, ipadx=5, ipady=3)
         date_entry.bind("<KeyRelease>", lambda e: self.update_list())
 
         # General search
         ttk.Label(filter_frame, text="Search:").pack(side="left", padx=(20,0))
         self.search_var = tk.StringVar()
-        search_entry = ttk.Entry(filter_frame, textvariable=self.search_var)
-        search_entry.pack(side="left", fill="x", expand=True, padx=5)
+        search_entry = tk.Entry(filter_frame, textvariable=self.search_var, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, insertbackground=BRIGHT_FG)
+        search_entry.pack(side="left", fill="x", expand=True, padx=5, ipadx=5, ipady=3)
         search_entry.bind("<KeyRelease>", lambda e: self.update_list())
-        ttk.Button(filter_frame, text="Clear", command=self.clear_search).pack(side="left")
+        ttk.Button(filter_frame, text="Clear", command=self.clear_search).pack(side="left", padx=5, ipadx=8, ipady=3)
 
         # --- Column Headers ---
         header_text = (
-            f"{'Date':<12} | {'Group':<35} | {'Show':<25} | {'Res':<8} | {'Score':<4} | {'Notes':<20} | {'Path'}"
+            f"{'Date':<12} | {'Group':<35} | {'Show':<15} | {'Res':<8} | {'Score':<4} | {'Notes':<80} | {'Path'}"
         )
-        header = tk.Label(self, text=header_text, font=("Courier New", 11, "bold"), anchor="w")
+        header = tk.Label(self, text=header_text, font=FONT_HEADER, anchor="w",
+                          bg=DARK_BG, fg=BRIGHT_FG)
         header.pack(fill="x", padx=10, pady=(5,0))
 
         # --- Results List with Scrollbars ---
-        listbox_frame = tk.Frame(self)
+        listbox_frame = tk.Frame(self, bg=DARK_BG)
         listbox_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
         # Vertical scrollbar
-        vscroll = tk.Scrollbar(listbox_frame, orient="vertical")
+        vscroll = tk.Scrollbar(
+            listbox_frame,
+            orient="vertical",
+            width=24,
+            bg=ACCENT,                # scrollbar background color
+            activebackground="#6272a4",  # color when hovered/active
+            troughcolor=DARK_BG       # color of the trough (track)
+        )
         vscroll.pack(side="right", fill="y")
 
         # Horizontal scrollbar
-        hscroll = tk.Scrollbar(listbox_frame, orient="horizontal")
+        hscroll = tk.Scrollbar(
+            listbox_frame,
+            orient="horizontal",
+            width=24,
+            bg=ACCENT,
+            activebackground="#6272a4",
+            troughcolor=DARK_BG
+        )
         hscroll.pack(side="bottom", fill="x")
 
         self.listbox = tk.Listbox(
             listbox_frame,
-            font=("Courier New", 11),
+            font=FONT_MAIN,
             yscrollcommand=vscroll.set,
             xscrollcommand=hscroll.set,
+            bg=DARK_BG,
+            fg=BRIGHT_FG,
+            selectbackground="#44475a",
+            selectforeground="#f1fa8c",
+            highlightbackground=ACCENT,
+            highlightcolor=ACCENT,
+            activestyle="none",
+            relief="flat",
+            borderwidth=0,
         )
         self.listbox.pack(side="left", fill="both", expand=True)
         self.listbox.bind("<Double-Button-1>", lambda e: self.play_selected())
@@ -80,11 +154,12 @@ class KpopDBBrowser(tk.Tk):
 
         # Play button
         play_btn = ttk.Button(self, text="Play Selected", command=self.play_selected)
-        play_btn.pack(pady=5)
+        play_btn.pack(pady=10, ipadx=10, ipady=5)
 
         # Status bar
         self.status_var = tk.StringVar(value="Ready.")
-        status = ttk.Label(self, textvariable=self.status_var, relief="sunken", anchor="w")
+        status = tk.Label(self, textvariable=self.status_var, relief="sunken", anchor="w",
+                          font=FONT_STATUS, bg=ACCENT, fg=BRIGHT_FG, padx=8, pady=6)
         status.pack(fill="x", side="bottom")
 
     def clear_search(self):
@@ -135,7 +210,7 @@ class KpopDBBrowser(tk.Tk):
             notes = perf[7] or ""
             path = perf[5] or ""
             # Adjust field widths as needed for your data
-            display = f"{date:<12} | {group:<35} | {show:<25} | {res:<8} | {score:<4} | {notes:<20} | {path}"
+            display = f"{date:<12} | {group:<35} | {show:<15} | {res:<8} | {score:<4} | {notes:<80} | {path}"
             # Apply filters
             if group_filter and group_filter != group.lower():
                 continue
@@ -157,9 +232,18 @@ class KpopDBBrowser(tk.Tk):
         if not file_path or not os.path.exists(file_path):
             messagebox.showerror("File not found", f"The file does not exist:\n{file_path}")
             return
-        # Show waiting message before launching player
+        # Show waiting message before accessing the file
         self.status_var.set("Waking up external drive, please wait...")
         self.update_idletasks()  # Force update of the status bar
+
+        try:
+            # Try to open the file for reading to trigger drive spin-up
+            with open(file_path, "rb"):
+                pass
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not access file: {e}")
+            return
+
         try:
             subprocess.Popen([MPV_PLAYER_PATH, file_path])
             self.status_var.set(f"Playing: {file_path}")
