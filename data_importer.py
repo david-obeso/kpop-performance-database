@@ -5,14 +5,14 @@ from sqlite3 import Error # <--- Import the Error class for better error handlin
 import re # Import regular expression module for path conversion
 
 # --- Configuration ---
-EXCEL_FILE_PATH = "/home/david/kpop-performance-database/KpopDatabase_2.1.xlsm" # The path to the Excel file
+EXCEL_FILE_PATH = "/home/david/kpop-performance-database/KpopDatabase.xlsm" # The path to the Excel file
 
 PERFORMANCES_SHEET_NAME = "TV Performances" # The exact name of the sheet in the Excel file
 
 COLUMNS_TO_READ = ['date', 'group', 'song', 'show', 'res', 'score', 'link'] # The columns we actually want to read from the Excel sheet
 
 # --- Database Configuration ---
-DATABASE_FILE = "kpop_music.db" # Name for our SQLite database file
+DATABASE_FILE = "kpop_database.db" # Name for our SQLite database file
 
 # SQL statements to create the tables
 # We use '''triple quotes''' for multi-line strings
@@ -125,9 +125,13 @@ def format_date(yyyymmdd_int):
         return None
 
 def convert_windows_path(win_path):
-    """Converts a Windows path (e.g., H:\...) to its Ubuntu equivalent."""
+    """Converts a Windows path (e.g., H:\...) to its Ubuntu equivalent, or passes through URLs."""
     if pd.isna(win_path) or not isinstance(win_path, str):
         return None
+
+    # Allow YouTube or web links
+    if win_path.startswith("https://") or win_path.startswith("http://"):
+        return win_path
 
     # Make path lowercase and normalize separators for easier matching
     win_path_lower = win_path.replace('\\', '/').lower()
@@ -137,12 +141,11 @@ def convert_windows_path(win_path):
             # Extract the part of the path after the drive letter and separator
             relative_path = win_path[len(drive_letter)+1:].replace('\\', '/') # Use original case after drive
             # Combine Ubuntu base path with the relative path
-            # os.path.join handles separators correctly
             return os.path.join(ubuntu_base, relative_path)
 
-    # If no mapping matched, return the original path (or None, or raise error)
+    # If no mapping matched, return None (not a valid path or URL)
     print(f"Warning: No path mapping found for Windows path: {win_path}")
-    return win_path # Or return None
+    return None
 
 def clean_text(text_value):
     """Handles NaN or other non-text values, returns string or None."""
@@ -238,7 +241,20 @@ def main():
         performances_df['processed_score'] = performances_df['score'].apply(clean_score)
 
         # Drop rows where essential info is missing after processing
-        performances_df.dropna(subset=['processed_date', 'ubuntu_path', 'clean_group'], inplace=True)
+        # Only drop rows where ubuntu_path is missing AND not a valid URL
+        def is_valid_path_or_url(val):
+            if pd.isna(val):
+                return False
+            if isinstance(val, str) and (val.startswith("https://") or val.startswith("http://")):
+                return True
+            return bool(val)
+
+        performances_df = performances_df[
+            performances_df['processed_date'].notna() &
+            performances_df['clean_group'].notna() &
+            performances_df['ubuntu_path'].apply(is_valid_path_or_url)
+        ]
+
         print(f"{len(performances_df)} rows remaining after cleaning required fields.")
 
         print("Data processing applied. First 5 rows processed:")
@@ -351,4 +367,3 @@ if __name__ == "__main__":
     main()
 
 
- 
