@@ -1,5 +1,5 @@
 # K-Pop Performance Database Browser
-# Version 3.2.3 (Score Editor UI Tweaks)
+# Version 3.3.0 (YouTube URL Playback & Unified Playback Handling)
 import os
 import subprocess
 import sqlite3
@@ -8,6 +8,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import random
+import webbrowser # Added for opening URLs
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode # Added for URL manipulation
 
 DATABASE_FILE = "kpop_database.db"
 MPV_PLAYER_PATH = "mpv"
@@ -125,7 +127,7 @@ class ScoreEditorWindow(tk.Toplevel):
                 "plus_btn": plus_btn, "minus_btn": minus_btn, "score_label_widget": score_label
             })
             self.update_button_states(score_var.get(), plus_btn, minus_btn)
-            score_label.config(text=str(score_var.get()))
+            score_label.config(text=str(score_var.get())) # Ensure initial text is set
 
 
         button_frame = ttk.Frame(self, style="TFrame")
@@ -143,9 +145,10 @@ class ScoreEditorWindow(tk.Toplevel):
         new_score = current_score + delta
         if 0 <= new_score <= 5:
             score_var.set(new_score)
+        # Update text immediately for the specific label
         for item_data in self.performance_items_data:
             if item_data["score_var"] == score_var:
-                item_data["score_label_widget"].config(text=str(score_var.get()))
+                item_data["score_label_widget"].config(text=str(score_var.get())) # Update text
                 break
         self.update_button_states(score_var.get(), plus_btn, minus_btn)
 
@@ -163,12 +166,18 @@ class ScoreEditorWindow(tk.Toplevel):
                     cursor.execute("UPDATE performances SET score = ? WHERE performance_id = ?", 
                                    (item_data["score_var"].get(), item_data["id"]))
                     updates_made += 1
-            if updates_made > 0: self.db_conn.commit(); messagebox.showinfo("Success", f"{updates_made} score(s) updated.", parent=self)
-            else: messagebox.showinfo("No Changes", "No scores were modified.", parent=self)
+            if updates_made > 0: 
+                self.db_conn.commit()
+                messagebox.showinfo("Success", f"{updates_made} score(s) updated.", parent=self)
+            else: 
+                messagebox.showinfo("No Changes", "No scores were modified.", parent=self)
         except sqlite3.Error as e:
-            self.db_conn.rollback(); messagebox.showerror("Database Error", f"Failed to update scores: {e}", parent=self)
+            self.db_conn.rollback()
+            messagebox.showerror("Database Error", f"Failed to update scores: {e}", parent=self)
         finally:
-            if self.refresh_callback: self.refresh_callback()
+            if self.refresh_callback: 
+                self.refresh_callback()
+            # self.destroy_and_clear_master_ref() # Moved to refresh_callback or cancel
 
     def cancel(self):
         if any(item["score_var"].get() != item["original_score"] for item in self.performance_items_data):
@@ -186,8 +195,8 @@ class KpopDBBrowser(tk.Tk):
         print("Attempting to mount Windows shares. Please enter your password in the console if prompted...")
         try:
             process = subprocess.run(
-                ["/home/david/mount_windows_shares.sh"],
-                check=False, capture_output=True, text=True
+                ["/home/david/mount_windows_shares.sh"], # User specific script
+                check=False, capture_output=True, text=True, timeout=15 
             )
             if process.returncode != 0:
                 error_message = f"Could not mount Windows shares!\n\nScript output:\n{process.stdout}\n{process.stderr}\n\nThe program will now exit."
@@ -196,25 +205,27 @@ class KpopDBBrowser(tk.Tk):
         except FileNotFoundError:
             error_message = "Mount script '/home/david/mount_windows_shares.sh' not found.\nThe program will now exit."
             print(error_message); root_temp = tk.Tk(); root_temp.withdraw(); messagebox.showerror("Mount Error", error_message, parent=None); root_temp.destroy(); sys.exit(1)
+        except subprocess.TimeoutExpired:
+            error_message = "Mount script timed out after 15 seconds.\nThe program will now exit."
+            print(error_message); root_temp = tk.Tk(); root_temp.withdraw(); messagebox.showerror("Mount Error", error_message, parent=None); root_temp.destroy(); sys.exit(1)
         except Exception as e:
             error_message = f"An unexpected error occurred during mounting: {e}\nThe program will now exit."
             print(error_message); root_temp = tk.Tk(); root_temp.withdraw(); messagebox.showerror("Mount Error", error_message, parent=None); root_temp.destroy(); sys.exit(1)
 
-
         super().__init__()
-        self.title("K-Pop Performance Database Browser v3.2.2") 
+        self.title("K-Pop Performance Database Browser v3.3.0") 
         self.geometry("2100x900")
         self.configure(bg=DARK_BG)
 
         # Colors for Combobox Listbox (dropdown part)
-        combobox_list_bg = '#333a40' # This color will also be used for readonly field background
+        combobox_list_bg = '#333a40' 
         combobox_list_select_bg = ACCENT
         combobox_list_select_fg = '#f1fa8c'
         self.option_add('*TCombobox*Listbox.background', combobox_list_bg)
         self.option_add('*TCombobox*Listbox.foreground', BRIGHT_FG)
         self.option_add('*TCombobox*Listbox.selectBackground', combobox_list_select_bg)
         self.option_add('*TCombobox*Listbox.selectForeground', combobox_list_select_fg)
-        self.option_add('*TCombobox*Listbox.font', FONT_MAIN) # Dropdown list font
+        self.option_add('*TCombobox*Listbox.font', FONT_MAIN) 
         self.option_add('*TCombobox*Listbox.relief', 'flat')
         self.option_add('*TCombobox*Listbox.borderwidth', 0)
 
@@ -226,14 +237,24 @@ class KpopDBBrowser(tk.Tk):
         self.status_var = tk.StringVar(value="Initializing...")
         self.play_button = None; self.play_random_button = None
         self.random_count_var = tk.StringVar(); self.random_count_dropdown = None
-        self.currently_playing_random_details = []
+        # self.currently_playing_random_details = [] # No longer needed directly here
         self.change_score_var = tk.BooleanVar(value=False)
         self.score_editor_window = None
 
         self.create_widgets()
         self.load_groups()
-        self.load_performances()
-        self.pre_wake_external_drives()
+        self.load_performances() # This will also trigger pre_wake_external_drives
+        # self.pre_wake_external_drives() # Called at the end of load_performances
+
+    @staticmethod
+    def is_youtube_url(path_string):
+        if not path_string:
+            return False
+        path_string_lower = path_string.lower()
+        return path_string_lower.startswith("https://www.youtube.com/") or \
+               path_string_lower.startswith("https://youtu.be/") or \
+               path_string_lower.startswith("http://www.youtube.com/") or \
+               path_string_lower.startswith("http://youtu.be/")
 
     def create_widgets(self):
         style = ttk.Style(self)
@@ -241,44 +262,37 @@ class KpopDBBrowser(tk.Tk):
         style.configure("TFrame", background=DARK_BG)
         style.configure("TLabel", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN)
         
-        # Updated TButton style for consistency with ScoreEditorWindow
         style.configure("TButton", background=ACCENT, foreground=BRIGHT_FG, font=FONT_BUTTON)
         style.map("TButton", 
                   background=[("active", "#6272a4"), ("disabled", "#303030")],
-                  foreground=[("disabled", "#888888")] # Muted text for disabled button
+                  foreground=[("disabled", "#888888")] 
         )
 
-        # --- MODIFIED Combobox Styling START ---
-        # Configure base properties like font and selection appearance for the Combobox field
         style.configure("Custom.TCombobox",
-            font=("Courier New", 16, "bold"), # Font for the text in the combobox field
-            selectbackground=ACCENT,          # Field background when combobox is focused (ACCENT is #44475a)
-            selectforeground=BRIGHT_FG        # Field text color when combobox is focused
+            font=("Courier New", 16, "bold"), 
+            selectbackground=ACCENT,          
+            selectforeground=BRIGHT_FG        
         )
-
-        # Map state-specific appearances for the Combobox
-        # This is key to ensuring the readonly state looks correct from the start.
         style.map("Custom.TCombobox",
             fieldbackground=[
-                ('readonly', '#333a40'),  # Field background for normal readonly state (dark grey)
-                ('disabled', '#2a2a2a')   # Field background when disabled (darker, muted)
+                ('readonly', '#333a40'),  
+                ('disabled', '#2a2a2a')  
             ],
             foreground=[
-                ('readonly', BRIGHT_FG),   # Text color for normal readonly state (bright)
-                ('disabled', '#777777')    # Text color when disabled (muted)
+                ('readonly', BRIGHT_FG),   
+                ('disabled', '#777777')    
             ],
-            background=[ # Affects the dropdown arrow button area
-                ('readonly', ACCENT),      # Button area normal state (matches TButton background)
-                ('active', '#6272a4'),     # Button area when hovered (matches TButton active state)
-                ('disabled', '#303030')    # Button area when disabled (matches TButton disabled state)
+            background=[ 
+                ('readonly', ACCENT),      
+                ('active', '#6272a4'),     
+                ('disabled', '#303030')    
             ],
-            arrowcolor=[ # Color of the dropdown arrow
+            arrowcolor=[ 
                 ('readonly', BRIGHT_FG),
-                ('active', BRIGHT_FG),     # Arrow color on hover (can be same as readonly)
-                ('disabled', '#777777')    # Arrow color when disabled (muted)
+                ('active', BRIGHT_FG),     
+                ('disabled', '#777777')    
             ]
         )
-        # --- MODIFIED Combobox Styling END ---
         
         style.configure("TCheckbutton", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN)
         style.map("TCheckbutton", indicatorcolor=[('selected', ACCENT), ('!selected', '#555555')], background=[('active', DARK_BG)])
@@ -291,12 +305,8 @@ class KpopDBBrowser(tk.Tk):
         ttk.Label(filter_frame, text="Group:").pack(side="left")
         self.group_var = tk.StringVar()
         self.group_dropdown = ttk.Combobox(
-            filter_frame,
-            textvariable=self.group_var,
-            state="readonly",
-            # font=("Courier New", 16, "bold"), # Font is now set by Custom.TCombobox style
-            style="Custom.TCombobox",
-            width=20
+            filter_frame, textvariable=self.group_var, state="readonly",
+            style="Custom.TCombobox", width=20
         )
         self.group_dropdown.pack(side="left", padx=5, ipadx=5, ipady=6)
         self.group_dropdown.bind("<<ComboboxSelected>>", lambda e: self.update_list())
@@ -342,20 +352,16 @@ class KpopDBBrowser(tk.Tk):
         ttk.Label(play_controls_frame, text="Count:").pack(side="left", padx=(10,2))
         self.random_count_var.set("3")
         self.random_count_dropdown = ttk.Combobox(
-            play_controls_frame,
-            textvariable=self.random_count_var,
-            values=["1", "2", "3", "5", "10", "All"],
-            state="readonly",
-            width=5,
-            # font=("Courier New", 16, "bold"), # Font is now set by Custom.TCombobox style
-            style="Custom.TCombobox"
+            play_controls_frame, textvariable=self.random_count_var,
+            values=["1", "2", "3", "5", "10", "All"], state="readonly",
+            width=5, style="Custom.TCombobox"
         )
         self.random_count_dropdown.pack(side="left")
         
         self.change_score_checkbox = ttk.Checkbutton(play_controls_frame, text="Change Score After Play", variable=self.change_score_var)
         self.change_score_checkbox.pack(side="left", padx=(20, 0))
 
-        status_font = ("Arial", 16, "bold") # Explicitly defined font for status bar
+        status_font = ("Arial", 16, "bold") 
         status = tk.Label(self, textvariable=self.status_var, relief="sunken", anchor="w", font=status_font, bg=ACCENT, fg=BRIGHT_FG, padx=8, pady=6)
         status.pack(fill="x", side="bottom"); self.status_var.set("Ready.")
 
@@ -378,7 +384,9 @@ class KpopDBBrowser(tk.Tk):
     def load_performances(self):
         self.status_var.set("Loading performances from database..."); self.update_idletasks()
         query = """SELECT performances.performance_id, groups.group_name, performances.performance_date, performances.show_type, performances.resolution, performances.file_path, performances.score, performances.notes FROM performances LEFT JOIN groups ON performances.group_id = groups.group_id ORDER BY performances.performance_date DESC"""
-        cur = self.conn.cursor(); cur.execute(query); self.performances = cur.fetchall(); self.update_list()
+        cur = self.conn.cursor(); cur.execute(query); self.performances = cur.fetchall()
+        self.update_list() # update_list will set status
+        self.pre_wake_external_drives() # Call after performances are loaded
 
     def update_list(self):
         group_filter = self.group_var.get().lower(); date_filter = self.date_var.get(); search_filter = self.search_var.get().lower(); filter_4k_enabled = self.filter_4k_var.get()
@@ -395,146 +403,273 @@ class KpopDBBrowser(tk.Tk):
                 res_lower = resolution.lower()
                 if not any(keyword in res_lower for keyword in self.RESOLUTION_HIGH_QUALITY_KEYWORDS): continue
             
-            display = f"{date:<12} | {group:<35} | {show:<15} | {resolution:<8} | {score:<4} | {songs_data:<80} | {path}"
-            if search_filter and search_filter not in display.lower(): continue
+            # Path part in display string will show full path/URL
+            display_path = path
+            if KpopDBBrowser.is_youtube_url(path):
+                display_path = "YouTube Link" # Or keep full URL if preferred, or first 30 chars
+            
+            # Truncate songs_data for display consistency, path will take remaining space or be truncated by listbox
+            songs_display = songs_data[:77] + '...' if len(songs_data) > 80 else songs_data
+            
+            # Display format updated for potentially long paths/URLs or shorter 'YouTube Link'
+            display = f"{date:<12} | {group:<35} | {show:<15} | {resolution:<8} | {score:<4} | {songs_display:<80} | {display_path}"
+
+            if search_filter:
+                # Search in all relevant fields, including the original full songs_data and path
+                searchable_text = f"{date} {group} {show} {resolution} {score} {songs_data} {path}".lower()
+                if search_filter not in searchable_text: continue
+            
             self.filtered.append(perf); self.listbox.insert(tk.END, display)
         self.status_var.set(f"{len(self.filtered)} performances match your filters.")
 
     def play_selected(self):
         if self.play_button and self.play_button.cget('state') == tk.DISABLED:
             self.status_var.set("Playback operation already in progress..."); self.update_idletasks(); return
-        selected_indices = self.listbox.curselection()
-        if not selected_indices: messagebox.showinfo("No selection", "Please select one or more performances to play.", parent=self); return
         
-        files_to_play, skipped_files_info, perfs_for_playback_details = [], [], []
+        selected_indices = self.listbox.curselection()
+        if not selected_indices: 
+            messagebox.showinfo("No selection", "Please select one or more performances to play.", parent=self); return
+        
+        local_files_to_play = []
+        youtube_urls_to_open = []
+        all_perf_details_for_callbacks = []
+        skipped_items_info = []
+
         for index_str in selected_indices:
             try:
                 perf_index = int(index_str)
                 if 0 <= perf_index < len(self.filtered):
-                    perf = self.filtered[perf_index]; file_path = perf[5]
-                    if not file_path: skipped_files_info.append(f"No path for: {perf[1] or 'N/A'} ({perf[2] or 'N/A'})"); continue
-                    if not os.path.exists(file_path): skipped_files_info.append(f"Not found: {os.path.basename(file_path)}"); continue
-                    files_to_play.append(file_path); perfs_for_playback_details.append(perf)
-            except ValueError: print(f"Warning: Could not parse selection index: {index_str}")
+                    perf = self.filtered[perf_index]
+                    file_path_or_url = perf[5]
+
+                    if not file_path_or_url:
+                        skipped_items_info.append(f"No path/URL for: {perf[1] or 'N/A'} ({perf[2] or 'N/A'})")
+                        continue
+                    
+                    is_url = KpopDBBrowser.is_youtube_url(file_path_or_url)
+                    if is_url:
+                        youtube_urls_to_open.append(file_path_or_url)
+                        all_perf_details_for_callbacks.append(perf)
+                    else: # Local file
+                        if not os.path.exists(file_path_or_url):
+                            skipped_items_info.append(f"Local file not found: {os.path.basename(file_path_or_url)}")
+                            continue
+                        local_files_to_play.append(file_path_or_url)
+                        all_perf_details_for_callbacks.append(perf)
+            except ValueError: 
+                print(f"Warning: Could not parse selection index: {index_str}")
         
-        if skipped_files_info: messagebox.showwarning("Playback Warning", "Some files were skipped:\n- " + "\n- ".join(skipped_files_info), parent=self)
-        if not files_to_play:
-            self.status_var.set("Ready. No valid files to play from selection.")
-            if not skipped_files_info: messagebox.showinfo("No Playable Files", "No valid files selected for playback.", parent=self)
+        if skipped_items_info: 
+            messagebox.showwarning("Playback Warning", "Some items were skipped:\n- " + "\n- ".join(skipped_items_info), parent=self)
+        
+        if not local_files_to_play and not youtube_urls_to_open:
+            self.status_var.set("Ready. No valid items to play from selection.")
+            if not skipped_items_info: # Only show if no other warning was given
+                 messagebox.showinfo("No Playable Items", "No valid files or YouTube URLs selected for playback.", parent=self)
             return
         
         self.disable_play_buttons()
-        first_file_basename = os.path.basename(files_to_play[0])
-        status_msg = f"Preparing to play {first_file_basename}..." if len(files_to_play) == 1 else f"Preparing {len(files_to_play)} files (starting with {first_file_basename})..."
-        self.status_var.set(status_msg); self.update_idletasks()
-        thread = threading.Thread(target=self._execute_play_playlist_and_handle_score, args=(files_to_play, perfs_for_playback_details, self), daemon=True)
-        thread.start()
+        
+        status_msg = "Preparing playback..."
+        if local_files_to_play:
+             status_msg = f"Preparing {len(local_files_to_play)} local file(s)"
+             if youtube_urls_to_open:
+                 status_msg += f" and {len(youtube_urls_to_open)} YouTube URL(s)."
+             else:
+                 status_msg += "."
+        elif youtube_urls_to_open:
+            status_msg = f"Preparing {len(youtube_urls_to_open)} YouTube URL(s)."
 
-    @staticmethod
-    def _execute_play_playlist_and_handle_score(file_paths_list, played_perf_details, app_instance):
-        if not file_paths_list:
-            if app_instance.winfo_exists(): app_instance.after(0, app_instance.enable_play_buttons)
-            return
-        first_file_path, first_file_basename, num_files, process = file_paths_list[0], os.path.basename(file_paths_list[0]), len(file_paths_list), None
-        try:
-            access_message = f"Accessing: {first_file_basename} (file 1 of {num_files}). Waking drive..."
-            if app_instance.winfo_exists(): app_instance.after(0, lambda: app_instance.status_var.set(access_message))
-            with open(first_file_path, "rb") as f: f.read(1)
-            command = [MPV_PLAYER_PATH] + file_paths_list; process = subprocess.Popen(command)
-            if app_instance.winfo_exists():
-                status_msg = f"Playing: {first_file_basename}" if num_files == 1 else f"Playing {num_files} files, starting with: {first_file_basename}. Waiting for player..."
-                app_instance.after(0, lambda: app_instance.status_var.set(status_msg))
-            process.wait()
-            if app_instance.winfo_exists():
-                app_instance.after(0, lambda: app_instance.status_var.set(f"Finished playing {num_files} file(s)."))
-                if app_instance.change_score_var.get() and played_perf_details:
-                    app_instance.after(0, lambda: app_instance.open_score_editor(played_perf_details, is_random_source=False))
-        except FileNotFoundError: 
-            if app_instance.winfo_exists():
-                error_msg = f"File not found: {first_file_path}"
-                app_instance.after(0, lambda: messagebox.showerror("File Not Found", error_msg, parent=app_instance))
-                app_instance.after(0, lambda: app_instance.status_var.set(f"Error: {error_msg}"))
-        except Exception as e:
-            if app_instance.winfo_exists():
-                error_msg = f"Could not access/play (starting with {first_file_path}): {e}"
-                app_instance.after(0, lambda: messagebox.showerror("Error", error_msg, parent=app_instance))
-                app_instance.after(0, lambda: app_instance.status_var.set(f"Error playing: {e}"))
-        finally:
-            if process and process.poll() is None:
-                try: process.terminate()
-                except: pass
-            if app_instance.winfo_exists(): app_instance.after(0, app_instance.enable_play_buttons)
+        self.status_var.set(status_msg); self.update_idletasks()
+
+        thread = threading.Thread(
+            target=KpopDBBrowser._execute_playback_sequence_and_callbacks, 
+            args=(local_files_to_play, youtube_urls_to_open, all_perf_details_for_callbacks, self, False), # False for is_random_source
+            daemon=True
+        )
+        thread.start()
 
     def play_random_videos(self):
         if self.play_random_button and self.play_random_button.cget('state') == tk.DISABLED:
             self.status_var.set("Playback operation already in progress..."); self.update_idletasks(); return
-        if not self.filtered: messagebox.showinfo("No Videos", "No videos match current filters to play randomly.", parent=self); return
+        if not self.filtered: 
+            messagebox.showinfo("No Videos", "No videos match current filters to play randomly.", parent=self); return
+        
         try:
             count_str = self.random_count_var.get()
-            num_to_play = len(self.filtered) if count_str.lower() == "all" else int(count_str)
-        except ValueError: messagebox.showerror("Invalid Count", "Please select a valid number of videos.", parent=self); return
-        if num_to_play <= 0: messagebox.showinfo("Invalid Count", "Number of videos must be > 0.", parent=self); return
+            num_to_sample = len(self.filtered) if count_str.lower() == "all" else int(count_str)
+        except ValueError: 
+            messagebox.showerror("Invalid Count", "Please select a valid number of videos.", parent=self); return
+        if num_to_sample <= 0: 
+            messagebox.showinfo("Invalid Count", "Number of videos must be > 0.", parent=self); return
 
-        actual_num_to_play = min(num_to_play, len(self.filtered))
-        chosen_perfs_all_details = random.sample(self.filtered, k=actual_num_to_play)
-        files_to_play, valid_chosen_perfs_details = [], []
-        for perf in chosen_perfs_all_details:
-            file_path = perf[5]
-            if file_path and os.path.exists(file_path):
-                files_to_play.append(file_path); valid_chosen_perfs_details.append(perf)
-        if not files_to_play:
-            messagebox.showinfo("No Playable Files", "No valid video files found among random selection.", parent=self)
-            self.status_var.set("Ready. No valid random files to play."); return
+        actual_num_to_sample = min(num_to_sample, len(self.filtered))
+        chosen_perfs_from_sample = random.sample(self.filtered, k=actual_num_to_sample)
+        
+        local_files_to_play = []
+        youtube_urls_to_open = []
+        all_perf_details_for_callbacks = []
+
+        for perf in chosen_perfs_from_sample:
+            file_path_or_url = perf[5]
+            if not file_path_or_url: continue # Silently skip if no path/URL
+
+            is_url = KpopDBBrowser.is_youtube_url(file_path_or_url)
+            if is_url:
+                youtube_urls_to_open.append(file_path_or_url)
+                all_perf_details_for_callbacks.append(perf)
+            else: # Local file
+                if os.path.exists(file_path_or_url):
+                    local_files_to_play.append(file_path_or_url)
+                    all_perf_details_for_callbacks.append(perf)
+                # else: Silently skip non-existent local file for random play
+        
+        if not local_files_to_play and not youtube_urls_to_open:
+            messagebox.showinfo("No Playable Items", "No valid video files or YouTube URLs found among random selection.", parent=self)
+            self.status_var.set("Ready. No valid random items to play."); return
+        
         self.disable_play_buttons()
-        first_file_basename = os.path.basename(files_to_play[0])
-        self.status_var.set(f"Preparing {len(files_to_play)} random videos (starting with {first_file_basename})...")
+        num_total_items = len(all_perf_details_for_callbacks)
+        self.status_var.set(f"Preparing {num_total_items} random item(s)...")
         self.update_idletasks()
-        thread = threading.Thread(target=self._execute_random_play_and_wait, args=(files_to_play, valid_chosen_perfs_details, self), daemon=True)
+
+        thread = threading.Thread(
+            target=KpopDBBrowser._execute_playback_sequence_and_callbacks, 
+            args=(local_files_to_play, youtube_urls_to_open, all_perf_details_for_callbacks, self, True), # True for is_random_source
+            daemon=True
+        )
         thread.start()
 
     @staticmethod
-    def _execute_random_play_and_wait(file_paths_list, chosen_perf_full_details, app_instance):
-        if not file_paths_list:
-            if app_instance.winfo_exists(): app_instance.after(0, app_instance.enable_play_buttons)
-            return
-        first_file_path, first_file_basename, num_files, process = file_paths_list[0], os.path.basename(file_paths_list[0]), len(file_paths_list), None
-        try:
-            access_message = f"Accessing: {first_file_basename} (random 1 of {num_files}). Waking drive..."
-            if app_instance.winfo_exists(): app_instance.after(0, lambda: app_instance.status_var.set(access_message))
-            with open(first_file_path, "rb") as f: f.read(1)
-            command = [MPV_PLAYER_PATH] + file_paths_list; process = subprocess.Popen(command)
-            if app_instance.winfo_exists():
-                status_msg = f"Playing {num_files} random videos (player open). Waiting for player to close..."
-                app_instance.after(0, lambda: app_instance.status_var.set(status_msg))
-            process.wait()
-            if app_instance.winfo_exists():
-                if app_instance.change_score_var.get() and chosen_perf_full_details:
-                    app_instance.after(0, lambda: app_instance.open_score_editor(chosen_perf_full_details, is_random_source=True))
-                    app_instance.after(0, lambda: app_instance.status_var.set(f"Finished playing {num_files} random videos. Score editor opened."))
-                elif chosen_perf_full_details:
-                    app_instance.after(0, lambda: app_instance.show_played_info_window(chosen_perf_full_details))
-                    app_instance.after(0, lambda: app_instance.status_var.set(f"Finished playing {num_files} random videos. Info window shown."))
-                else: app_instance.after(0, lambda: app_instance.status_var.set(f"Finished playing {num_files} random videos."))
-        except FileNotFoundError: 
-            if app_instance.winfo_exists():
-                error_msg = f"File not found (random play): {first_file_path}"
-                app_instance.after(0, lambda: messagebox.showerror("File Not Found", error_msg, parent=app_instance))
-                app_instance.after(0, lambda: app_instance.status_var.set(f"Error: {error_msg}"))
-        except Exception as e:
-            if app_instance.winfo_exists():
-                error_msg = f"Could not access/play random (starting with {first_file_path}): {e}"
-                app_instance.after(0, lambda: messagebox.showerror("Error", error_msg, parent=app_instance))
-                app_instance.after(0, lambda: app_instance.status_var.set(f"Error playing random: {e}"))
-        finally:
-            if process and process.poll() is None:
-                try: process.terminate()
-                except: pass
-            if app_instance.winfo_exists(): app_instance.after(0, app_instance.enable_play_buttons)
+    def _execute_playback_sequence_and_callbacks(
+        local_file_paths_list, youtube_url_list,
+        all_processed_perf_details, 
+        app_instance, is_random_source
+    ):
+        if not app_instance.winfo_exists(): return
 
+        if not local_file_paths_list and not youtube_url_list:
+            app_instance.after(0, app_instance.enable_play_buttons)
+            app_instance.after(0, lambda: app_instance.status_var.set("Ready. Nothing to play."))
+            return
+
+        # --- Handle Local Files with MPV ---
+        mpv_played_count = 0
+        if local_file_paths_list:
+            first_local_file_path = local_file_paths_list[0]
+            first_local_file_basename = os.path.basename(first_local_file_path)
+            num_local_files = len(local_file_paths_list)
+            mpv_process = None
+            try:
+                access_message = f"Accessing local: {first_local_file_basename} (1 of {num_local_files}). Waking drive..."
+                if app_instance.winfo_exists(): app_instance.after(0, lambda: app_instance.status_var.set(access_message))
+                
+                with open(first_local_file_path, "rb") as f: f.read(1) # Pre-access first file
+
+                command = [MPV_PLAYER_PATH] + local_file_paths_list
+                mpv_process = subprocess.Popen(command)
+                mpv_played_count = num_local_files # Assume all will be attempted by mpv
+
+                if app_instance.winfo_exists():
+                    status_msg = f"Playing local: {first_local_file_basename}" if num_local_files == 1 else \
+                                 f"Playing {num_local_files} local files (starting with: {first_local_file_basename}). Waiting for player..."
+                    app_instance.after(0, lambda: app_instance.status_var.set(status_msg))
+                
+                mpv_process.wait() # Wait for MPV to finish
+
+                if app_instance.winfo_exists():
+                    app_instance.after(0, lambda: app_instance.status_var.set(f"Finished playing {num_local_files} local file(s)."))
+            
+            except FileNotFoundError: # Covers MPV not found or first_local_file_path not found before Popen
+                 if app_instance.winfo_exists():
+                    error_msg = f"MPV player not found ('{MPV_PLAYER_PATH}') OR file access error for '{first_local_file_path}'."
+                    app_instance.after(0, lambda: messagebox.showerror("Playback Error", error_msg, parent=app_instance))
+                    app_instance.after(0, lambda: app_instance.status_var.set(f"Error: {error_msg}"))
+                    mpv_played_count = 0 # Reset as it failed
+            except Exception as e:
+                if app_instance.winfo_exists():
+                    error_msg = f"Could not play local files (starting with {first_local_file_path}): {e}"
+                    app_instance.after(0, lambda: messagebox.showerror("Playback Error", error_msg, parent=app_instance))
+                    app_instance.after(0, lambda: app_instance.status_var.set(f"Error playing local: {e}"))
+                    mpv_played_count = 0 # Reset on general error
+            finally:
+                if mpv_process and mpv_process.poll() is None:
+                    try: mpv_process.terminate()
+                    except: pass
+        
+        # --- Handle YouTube URLs ---
+        yt_opened_count = 0
+        if youtube_url_list:
+            num_youtube_urls = len(youtube_url_list)
+            if app_instance.winfo_exists():
+                app_instance.after(0, lambda: app_instance.status_var.set(f"Opening {num_youtube_urls} YouTube video(s) in browser..."))
+
+            for url in youtube_url_list:
+                try:
+                    parsed_url = urlparse(url)
+                    query_params = parse_qs(parsed_url.query)
+                    query_params['autoplay'] = ['1']
+                    query_params['rel'] = ['0'] # Optional: disable related videos from other channels
+                    # query_params['modestbranding'] = ['1'] # Optional: less YouTube branding (if it works)
+                    
+                    new_query_string = urlencode(query_params, doseq=True)
+                    final_url_parts = list(parsed_url)
+                    final_url_parts[4] = new_query_string 
+                    final_url = urlunparse(final_url_parts)
+                    
+                    if webbrowser.open_new_tab(final_url):
+                        yt_opened_count += 1
+                except webbrowser.Error as e:
+                    if app_instance.winfo_exists():
+                        app_instance.after(0, lambda u=url, err=e: app_instance.status_var.set(f"Failed to open {u}: {err}"))
+                        # Consider a non-blocking warning if many URLs fail
+                        # app_instance.after(0, lambda u=url, err=e: messagebox.showwarning("Browser Error", f"Could not open URL {u}:\n{err}", parent=app_instance))
+                except Exception as e: # Catch other potential errors during URL processing
+                    if app_instance.winfo_exists():
+                        app_instance.after(0, lambda u=url, err=e: app_instance.status_var.set(f"Error processing URL {u}: {err}"))
+
+
+            if app_instance.winfo_exists():
+                status_parts = []
+                if local_file_paths_list: # If local files were part of this operation
+                    status_parts.append(f"{mpv_played_count} local file(s) processed.")
+                
+                if yt_opened_count == num_youtube_urls:
+                    status_parts.append(f"{yt_opened_count} YouTube video(s) opened.")
+                else:
+                    status_parts.append(f"{yt_opened_count} of {num_youtube_urls} YouTube video(s) opened (some may have failed).")
+                
+                app_instance.after(0, lambda: app_instance.status_var.set(" ".join(status_parts)))
+
+        # --- Post-Playback Callbacks (common for both local and YouTube) ---
+        if app_instance.winfo_exists():
+            app_instance.after(100, app_instance.enable_play_buttons) # Enable buttons (slight delay to allow status update)
+
+            if all_processed_perf_details: # Ensure there's something to process for callbacks
+                total_items_for_callback = len(all_processed_perf_details)
+                
+                # Set a slightly delayed final status summarizing the operation
+                final_summary_status = f"Playback actions complete for {total_items_for_callback} item(s). "
+                if app_instance.change_score_var.get():
+                    final_summary_status += "Score editor opening..."
+                elif is_random_source:
+                    final_summary_status += "Info window opening..."
+                else:
+                    final_summary_status += "Ready."
+                app_instance.after(500, lambda fs=final_summary_status: app_instance.status_var.set(fs))
+
+
+                if app_instance.change_score_var.get():
+                    app_instance.after(600, lambda: app_instance.open_score_editor(all_processed_perf_details, is_random_source))
+                elif is_random_source: # Not changing score, but it was random play
+                    app_instance.after(600, lambda: app_instance.show_played_info_window(all_processed_perf_details))
+            else: # No items were actually processed for callbacks (e.g., all skipped or failed before this stage)
+                app_instance.after(500, lambda: app_instance.status_var.set("Ready. No valid items were processed for further actions."))
+        
     def show_played_info_window(self, played_details):
         if not played_details: return
         info_window = tk.Toplevel(self); info_window.title("Played Performance Details (Random Selection)"); info_window.geometry("800x450")
-        info_window.configure(bg=DARK_BG); info_window.transient(self)
+        info_window.configure(bg=DARK_BG); info_window.transient(self); info_window.grab_set()
         text_area_frame = ttk.Frame(info_window); text_area_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10,0))
         text_area = tk.Text(text_area_frame, wrap=tk.WORD, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, relief="flat", borderwidth=0,
                             selectbackground="#44475a", selectforeground="#f1fa8c", insertbackground=BRIGHT_FG)
@@ -545,68 +680,130 @@ class KpopDBBrowser(tk.Tk):
             group = perf[1] or "N/A"; date = perf[2] or "N/A"; show = perf[3] or "N/A"
             score = str(perf[6]) if perf[6] is not None else "N/A"
             songs_text = perf[7] or "N/A" 
+            path_info = perf[5] or "N/A"
+            if KpopDBBrowser.is_youtube_url(path_info): path_info = f"YouTube: {path_info}"
+            else: path_info = f"File: {path_info}"
+
             text_area.insert(tk.END, f"{i+1}. Group: {group}\n")
             text_area.insert(tk.END, f"   Date:  {date}\n")
             text_area.insert(tk.END, f"   Show:  {show}\n")
             text_area.insert(tk.END, f"   Score: {score}\n")
-            text_area.insert(tk.END, f"   Songs: {songs_text}\n\n")
+            text_area.insert(tk.END, f"   Songs: {songs_text}\n")
+            text_area.insert(tk.END, f"   Source: {path_info}\n\n")
         text_area.config(state=tk.DISABLED)
         close_button = ttk.Button(info_window, text="Close", command=info_window.destroy); close_button.pack(pady=10)
+        info_window.focus_set()
 
     def open_score_editor(self, played_performance_details, is_random_source=False):
         if self.score_editor_window and self.score_editor_window.winfo_exists():
             self.score_editor_window.lift(); self.score_editor_window.focus_set()
             messagebox.showwarning("Editor Open", "The score editor window is already open.", parent=self); return
-        if not played_performance_details: messagebox.showinfo("No Details", "No performance details available to edit scores.", parent=self); return
-        editor_title = f"{'Randomly Played' if is_random_source else 'Played'} Performance Score Editor"
+        if not played_performance_details: 
+            messagebox.showinfo("No Details", "No performance details available to edit scores.", parent=self); return
+        
+        editor_title_prefix = "Randomly Played" if is_random_source else "Selected"
+        editor_title = f"{editor_title_prefix} Items - Score Editor"
         self.score_editor_window = ScoreEditorWindow(self, editor_title, played_performance_details, self.conn, self.refresh_data_and_ui)
 
     def refresh_data_and_ui(self):
-        if self.score_editor_window and self.score_editor_window.winfo_exists(): self.score_editor_window.destroy_and_clear_master_ref()
-        self.score_editor_window = None
-        self.load_performances()
-        self.status_var.set("Scores updated. List refreshed."); self.enable_play_buttons()
+        # This is called by ScoreEditorWindow on save/cancel that leads to destroy
+        # Ensure score_editor_window reference is cleared if it was destroyed by its own methods
+        if self.score_editor_window and not self.score_editor_window.winfo_exists():
+             self.score_editor_window = None
+        elif self.score_editor_window : # If it still exists, destroy it (e.g. called after save)
+            self.score_editor_window.destroy_and_clear_master_ref() # This will set self.score_editor_window to None
+        
+        self.load_performances() # Reloads data and updates list
+        self.status_var.set("Scores possibly updated. List refreshed."); self.enable_play_buttons()
+
 
     def pre_wake_external_drives(self):
-        if not self.performances: self.status_var.set("No performances loaded for pre-wake."); return
-        unique_dirs = sorted(list(set(os.path.dirname(perf[5]) for perf in self.performances if perf[5] and os.path.dirname(perf[5]))))
+        if not self.performances: 
+            # self.status_var.set("No performances loaded for pre-wake.") # Can be noisy if list is empty
+            return
+        
+        # Filter out YouTube URLs and ensure path is not None before calling os.path.dirname
+        local_file_paths = [
+            perf[5] for perf in self.performances 
+            if perf[5] and not KpopDBBrowser.is_youtube_url(perf[5])
+        ]
+        if not local_file_paths:
+            # self.status_var.set("No local file paths found for pre-wake.")
+            return
+
+        unique_dirs = sorted(list(set(
+            os.path.dirname(path) for path in local_file_paths if os.path.dirname(path)
+        )))
+        
+        if not unique_dirs: 
+            # self.status_var.set("Could not identify distinct drive paths for pre-wake.")
+            return
+
         dirs_to_ping = []
         if unique_dirs:
             dirs_to_ping.append(unique_dirs[0])
-            if len(unique_dirs) > 2:
+            if len(unique_dirs) > 2: # If at least 3 unique dirs
                 mid_idx = len(unique_dirs) // 2
-                if not unique_dirs[mid_idx].startswith(dirs_to_ping[0]): dirs_to_ping.append(unique_dirs[mid_idx])
-            if len(unique_dirs) > 1:
+                # Ensure mid_idx is not same as first and not a subpath of first
+                if unique_dirs[mid_idx] != dirs_to_ping[0] and not unique_dirs[mid_idx].startswith(dirs_to_ping[0] + os.sep):
+                    dirs_to_ping.append(unique_dirs[mid_idx])
+            if len(unique_dirs) > 1: # If at least 2 unique dirs
                 last_dir = unique_dirs[-1]
-                if not last_dir.startswith(dirs_to_ping[0]) and (len(dirs_to_ping) < 2 or not last_dir.startswith(dirs_to_ping[1])): dirs_to_ping.append(last_dir)
-        dirs_to_ping = sorted(list(set(dirs_to_ping)))
-        if not dirs_to_ping: self.status_var.set("Could not identify distinct drive paths for pre-wake."); return
-        display_dirs, display_dirs_str = dirs_to_ping[:3], ", ".join(dirs_to_ping[:3])
-        if len(dirs_to_ping) > 3: display_dirs_str += f"... and {len(dirs_to_ping)-3} more"
-        self.status_var.set(f"Attempting to pre-wake drives for paths like: {display_dirs_str}..."); self.update_idletasks()
-        thread = threading.Thread(target=self._execute_pre_wake, args=(dirs_to_ping, self), daemon=True); thread.start()
+                # Ensure last_dir is not same as first (or mid if mid exists) and not a subpath
+                is_new_dir = True
+                for existing_dir in dirs_to_ping:
+                    if last_dir == existing_dir or last_dir.startswith(existing_dir + os.sep):
+                        is_new_dir = False
+                        break
+                if is_new_dir:
+                     dirs_to_ping.append(last_dir)
+        
+        dirs_to_ping = sorted(list(set(dirs_to_ping))) # Remove duplicates again if logic above allows
+        dirs_to_ping = dirs_to_ping[:3] # Limit to a max of 3 pings
+
+        if not dirs_to_ping: 
+            # self.status_var.set("No suitable distinct drive paths for pre-wake after filtering.")
+            return
+            
+        display_dirs_str = ", ".join([os.path.basename(p) if os.path.basename(p) else p for p in dirs_to_ping]) # Show dir names
+        
+        # Check current status to avoid overwriting important messages like "Loading..."
+        current_status = self.status_var.get()
+        if "Loading" not in current_status and "Playing" not in current_status and "Accessing" not in current_status:
+             self.status_var.set(f"Pre-waking drives (e.g., {display_dirs_str})..."); self.update_idletasks()
+        
+        thread = threading.Thread(target=KpopDBBrowser._execute_pre_wake, args=(dirs_to_ping, self), daemon=True); thread.start()
 
     @staticmethod
     def _execute_pre_wake(dir_paths, app_instance): 
+        if not app_instance.winfo_exists(): return
         woken_count, error_count = 0, 0
         for dir_path in dir_paths:
             try:
-                if not os.path.isdir(dir_path):
-                    potential_dir = os.path.dirname(dir_path)
-                    if os.path.isdir(potential_dir): dir_path = potential_dir
-                    else: continue
-                os.listdir(dir_path); woken_count += 1
-            except Exception: error_count += 1
-        final_message = f"Pre-wake attempt finished. Accessed {woken_count} paths."
-        if error_count > 0: final_message += f" Encountered issues with {error_count} paths."
-        if app_instance.winfo_exists(): app_instance.after(0, lambda: app_instance.status_var.set(final_message))
+                # Ensure it's actually a directory and not a file path mistakenly passed
+                # The logic in pre_wake_external_drives should give directory paths.
+                if os.path.isdir(dir_path):
+                    os.listdir(dir_path) # The actual "wake" operation
+                    woken_count += 1
+                # else: # It's a file path or does not exist, skip (already handled by os.path.isdir)
+            except Exception: 
+                error_count += 1
+        
+        if app_instance.winfo_exists(): # Check again before UI update
+            current_status = app_instance.status_var.get()
+            # Avoid overwriting critical status messages
+            if "Loading" not in current_status and "Playing" not in current_status and "Accessing" not in current_status:
+                final_message = f"Pre-wake: {woken_count} paths accessed."
+                if error_count > 0: final_message += f" ({error_count} issues)."
+                else: final_message += " Ready."
+                app_instance.after(0, lambda: app_instance.status_var.set(final_message))
 
 
     def on_closing(self): 
         if self.score_editor_window and self.score_editor_window.winfo_exists():
-            self.score_editor_window.cancel() 
-            if self.score_editor_window and self.score_editor_window.winfo_exists(): # Check again as cancel might destroy it
-                self.score_editor_window.destroy()
+            self.score_editor_window.cancel() # This might destroy it
+            if self.score_editor_window and self.score_editor_window.winfo_exists():
+                self.score_editor_window.destroy_and_clear_master_ref()
         self.conn.close(); self.destroy()
 
 if __name__ == "__main__":

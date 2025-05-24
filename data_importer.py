@@ -85,6 +85,14 @@ SQL_CREATE_FANCAMS_TABLE = """CREATE TABLE IF NOT EXISTS fancams (
                                 FOREIGN KEY (song_id) REFERENCES songs (song_id)
                             );"""
 
+SQL_CREATE_SONG_ARTISTS_TABLE = """CREATE TABLE IF NOT EXISTS song_artists (
+                                    song_id INTEGER NOT NULL,
+                                    group_id INTEGER NOT NULL,
+                                    FOREIGN KEY (song_id) REFERENCES songs (song_id),
+                                    FOREIGN KEY (group_id) REFERENCES groups (group_id),
+                                    PRIMARY KEY (song_id, group_id)
+                                );"""
+
 # --- Path Mapping (Based on your mount script) ---
 # Maps Windows Drive Letters (lowercase) to Ubuntu base paths
 PATH_MAPPINGS = {
