@@ -4,11 +4,7 @@ This project is my journey into learning Computer Science by building a database
 
 ## Database Schema
 
-The structure of the database is outlined in the Entity-Relationship Diagram below:
-
-![Kpop Performances Database ERD](images/erd.png)
-
-The corresponding SQLite script to create this schema can be found at `./database/schema.sql`.
+The structure of the database is described in /home/david/kpop-performance-database/database/info/database_structure.txt
 
 ## Mounting External Shares
 

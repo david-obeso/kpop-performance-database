@@ -188,32 +188,18 @@ class DataEntryWindow(tk.Toplevel):
         artist_frame.pack(fill="x", pady=10, anchor="n")
 
         ttk.Label(artist_frame, text="Primary Artist:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
-        
-        artist_names_for_combo = [artist['name'] for artist in self.all_artists_list]
-        is_artist_list_empty = not bool(artist_names_for_combo)
-        
-        if is_artist_list_empty:
-            current_artist_values = ["No artists in DB"]
-            combobox_state = "disabled"
-        else:
-            current_artist_values = artist_names_for_combo
-            combobox_state = "readonly"
 
-        self.primary_artist_combo = ttk.Combobox(artist_frame, textvariable=self.primary_artist_var,
-                                                 values=current_artist_values, width=30, style="DataEntry.TCombobox",
-                                                 state=combobox_state) 
-        self.primary_artist_combo.grid(row=0, column=1, sticky="ew", pady=2, padx=2)
-        
-        if not is_artist_list_empty:
-             self.primary_artist_combo.current(0) 
-             self.primary_artist_var.set(self.primary_artist_combo.get()) # Ensure var is set
-        else:
-            self.primary_artist_var.set("No artists in DB")
+        artist_entry = ttk.Entry(
+            artist_frame, textvariable=self.primary_artist_var, width=30, style="DataEntry.TEntry", state="readonly"
+        )
+        artist_entry.grid(row=0, column=1, sticky="ew", pady=2, padx=(2,0))
 
-        if not is_artist_list_empty: 
-            self.primary_artist_combo.bind("<KeyPress>", self.handle_artist_combo_keypress)
-        
-        artist_frame.columnconfigure(1, weight=1) 
+        select_btn = ttk.Button(
+            artist_frame, text="Select...", command=self.show_artist_listbox_popup, style="DataEntry.TButton"
+        )
+        select_btn.grid(row=0, column=2, sticky="w", padx=(4,2))
+
+        artist_frame.columnconfigure(1, weight=1)
 
         artist_buttons_frame = ttk.Frame(artist_frame, style="DataEntry.TFrame")
         artist_buttons_frame.grid(row=1, column=0, columnspan=2, pady=(10,5), sticky="ew")
@@ -261,10 +247,65 @@ class DataEntryWindow(tk.Toplevel):
             messagebox.showinfo("URL Check", f"URL seems valid:\n{url}", parent=self)
         else:
             messagebox.showerror("URL Check", f"URL does not seem valid:\n{url}", parent=self)
-        # print(f"Checking URL: {url}") # Keep for console feedback if desired
+        # print(f"Checking URL: {url") # Keep for console feedback if desired
 
     def close_window(self):
         if hasattr(self.master_app, 'data_entry_window_instance') and \
            self.master_app.data_entry_window_instance == self:
             self.master_app.data_entry_window_instance = None
         self.destroy()
+
+    def show_artist_listbox_popup(self):
+        if not self.all_artists_list:
+            messagebox.showinfo("No Artists", "No artists available in the database.", parent=self)
+            return
+
+        popup = tk.Toplevel(self)
+        popup.title("Select Primary Artist")
+        popup.configure(bg=DARK_BG)
+        popup.geometry("350x400+%d+%d" % (self.winfo_rootx()+100, self.winfo_rooty()+100))
+        popup.transient(self)
+        popup.grab_set()
+
+        listbox = tk.Listbox(
+            popup, font=FONT_MAIN, bg="#333a40", fg=BRIGHT_FG, selectbackground=ACCENT,
+            selectforeground="#f1fa8c", activestyle="none", highlightthickness=0
+        )
+        listbox.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for artist in self.all_artists_list:
+            listbox.insert(tk.END, artist['name'])
+
+        def on_select(event=None):
+            selection = listbox.curselection()
+            if selection:
+                artist_name = listbox.get(selection[0])
+                self.primary_artist_var.set(artist_name)
+                popup.destroy()
+
+        def on_key(event):
+            # Jump to letter
+            if event.char and event.char.isprintable():
+                typed = event.char.lower()
+                for idx, artist in enumerate(self.all_artists_list):
+                    if artist['name'].lower().startswith(typed):
+                        listbox.selection_clear(0, tk.END)
+                        listbox.selection_set(idx)
+                        listbox.see(idx)
+                        break
+            elif event.keysym in ("Return", "KP_Enter"):
+                on_select()
+            elif event.keysym == "Escape":
+                popup.destroy()
+
+        listbox.bind("<Double-Button-1>", on_select)
+        listbox.bind("<Return>", on_select)
+        listbox.bind("<Key>", on_key)
+        listbox.focus_set()
+
+        # Pre-select current value if set
+        current = self.primary_artist_var.get()
+        if current in [artist['name'] for artist in self.all_artists_list]:
+            idx = [artist['name'] for artist in self.all_artists_list].index(current)
+            listbox.selection_set(idx)
+            listbox.see(idx)

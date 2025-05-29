@@ -1,29 +1,35 @@
+# main_ui.py
+
 import os
 import subprocess
-import sqlite3
+import sqlite3 # Needed for ScoreEditorWindow's except sqlite3.Error
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import random
-import webbrowser # Added for opening URLs
-from urllib.parse import urlparse, urlunparse, parse_qs, urlencode # Added for URL manipulation
+import webbrowser
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
-DATABASE_FILE = "kpop_database.db" # MAKE SURE THIS POINTS TO YOUR NEW DATABASE
-MPV_PLAYER_PATH = "mpv"
+# Modularized imports
+import config
+import utils
+import db_operations
+import data_entry_ui # For the new data entry window
 
+# Constants
 DARK_BG = "#222222"
 BRIGHT_FG = "#f8f8f2"
 ACCENT = "#44475a"
 FONT_MAIN = ("Courier New", 13)
-FONT_HEADER = ("Courier New", 13, "bold") # Used for the score number & listbox header
-FONT_LABEL_SMALL = ("Courier New", 11) # For "Score Change" label
+FONT_HEADER = ("Courier New", 13, "bold")
+FONT_LABEL_SMALL = ("Courier New", 11)
 FONT_STATUS = ("Arial", 13)
 FONT_BUTTON = ("Arial", 13, "bold")
 
-APP_VERSION = "4.0.1 (UI Refinements)" # Or 4.0.2 if you consider this a bugfix version
+APP_VERSION = "4.0.2 (Data Entry UI - Phase 1)" # Updated version
 
-class ScoreEditorWindow(tk.Toplevel):
+class ScoreEditorWindow(tk.Toplevel): # Keep this class definition as it was
     def __init__(self, master, title, performance_details_list_dicts, db_connection, refresh_callback):
         super().__init__(master)
         self.title(title)
@@ -154,8 +160,11 @@ class ScoreEditorWindow(tk.Toplevel):
         plus_btn.config(state=tk.NORMAL if score < 5 else tk.DISABLED)
         minus_btn.config(state=tk.NORMAL if score > 0 else tk.DISABLED)
 
-    def save_changes(self):
+    def save_changes(self): 
         updates_made = 0
+        if not self.db_conn:
+            messagebox.showerror("Database Error", "No database connection available to save scores.", parent=self)
+            return
         try:
             cursor = self.db_conn.cursor()
             for item_data in self.performance_items_data:
@@ -168,7 +177,7 @@ class ScoreEditorWindow(tk.Toplevel):
                 messagebox.showinfo("Success", f"{updates_made} score(s) updated.", parent=self)
             else: 
                 messagebox.showinfo("No Changes", "No scores were modified.", parent=self)
-        except sqlite3.Error as e:
+        except sqlite3.Error as e: 
             self.db_conn.rollback()
             messagebox.showerror("Database Error", f"Failed to update scores: {e}", parent=self)
         finally:
@@ -186,29 +195,16 @@ class ScoreEditorWindow(tk.Toplevel):
             self.master.score_editor_window = None
         self.destroy()
 
+def show_startup_error_and_exit(title, message):
+    """Helper function to show an error and exit before main GUI starts."""
+    error_root = tk.Tk()
+    error_root.withdraw()
+    messagebox.showerror(title, message, parent=error_root)
+    error_root.destroy()
+    sys.exit(1)
+
 class KpopDBBrowser(tk.Tk):
     def __init__(self):
-        # Mount script logic (user-specific, retained)
-        print("Attempting to mount Windows shares. Please enter your password in the console if prompted...")
-        try:
-            process = subprocess.run(
-                ["/home/david/mount_windows_shares.sh"], # User specific script
-                check=False, capture_output=True, text=True, timeout=15 
-            )
-            if process.returncode != 0:
-                error_message = f"Could not mount Windows shares!\n\nScript output:\n{process.stdout}\n{process.stderr}\n\nThe program will now exit."
-                print(error_message); root_temp = tk.Tk(); root_temp.withdraw(); messagebox.showerror("Mount Error", error_message, parent=None); root_temp.destroy(); sys.exit(1)
-            print("Windows shares mounted (or already mounted).")
-        except FileNotFoundError:
-            error_message = "Mount script '/home/david/mount_windows_shares.sh' not found.\nThe program will now exit."
-            print(error_message); root_temp = tk.Tk(); root_temp.withdraw(); messagebox.showerror("Mount Error", error_message, parent=None); root_temp.destroy(); sys.exit(1)
-        except subprocess.TimeoutExpired:
-            error_message = "Mount script timed out after 15 seconds.\nThe program will now exit."
-            print(error_message); root_temp = tk.Tk(); root_temp.withdraw(); messagebox.showerror("Mount Error", error_message, parent=None); root_temp.destroy(); sys.exit(1)
-        except Exception as e:
-            error_message = f"An unexpected error occurred during mounting: {e}\nThe program will now exit."
-            print(error_message); root_temp = tk.Tk(); root_temp.withdraw(); messagebox.showerror("Mount Error", error_message, parent=None); root_temp.destroy(); sys.exit(1)
-
         super().__init__()
         self.title(f"K-Pop Performance Database Browser v{APP_VERSION}") 
         self.geometry("2200x950") 
@@ -221,8 +217,7 @@ class KpopDBBrowser(tk.Tk):
         self.option_add('*TCombobox*Listbox.font', FONT_MAIN) 
         self.option_add('*TCombobox*Listbox.relief', 'flat')
         self.option_add('*TCombobox*Listbox.borderwidth', 0)
-
-        self.conn = sqlite3.connect(DATABASE_FILE)
+        
         self.all_performances_data = [] 
         self.filtered_performances_data = [] 
         self.artists_list = [] 
@@ -233,27 +228,11 @@ class KpopDBBrowser(tk.Tk):
         self.random_count_var = tk.StringVar(); self.random_count_dropdown = None
         self.change_score_var = tk.BooleanVar(value=False)
         self.score_editor_window = None
+        self.data_entry_window_instance = None # For the new data entry window
 
         self.create_widgets()
         self.load_artists() 
         self.load_performances()
-
-    @staticmethod
-    def is_youtube_url(path_string):
-        if not path_string: return False
-        path_string_lower = path_string.lower()
-        return path_string_lower.startswith(("https://www.youtube.com/", "https://youtu.be/", 
-                                             "http://www.youtube.com/", "http://youtu.be/"))
-
-    @staticmethod
-    def get_playable_path_info(perf_data_dict):
-        if perf_data_dict.get("file_path1") and os.path.exists(perf_data_dict["file_path1"]):
-            return perf_data_dict["file_path1"], False
-        if perf_data_dict.get("file_path2") and os.path.exists(perf_data_dict["file_path2"]):
-            return perf_data_dict["file_path2"], False
-        if perf_data_dict.get("file_url"):
-            return perf_data_dict["file_url"], KpopDBBrowser.is_youtube_url(perf_data_dict["file_url"])
-        return None, False
 
     def create_widgets(self):
         style = ttk.Style(self)
@@ -310,7 +289,6 @@ class KpopDBBrowser(tk.Tk):
 
         listbox_frame = tk.Frame(self, bg=DARK_BG); listbox_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # --- CORRECTED LISTBOX AND SCROLLBAR CREATION ORDER ---
         self.listbox = tk.Listbox(listbox_frame, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG,
             selectbackground="#44475a", selectforeground="#f1fa8c", highlightbackground=ACCENT, highlightcolor=ACCENT,
             activestyle="none", relief="flat", borderwidth=0, selectmode=tk.EXTENDED)
@@ -323,10 +301,17 @@ class KpopDBBrowser(tk.Tk):
         vscroll.pack(side="right", fill="y")
         hscroll.pack(side="bottom", fill="x")
         self.listbox.pack(side="left", fill="both", expand=True)
-        # --- END CORRECTION ---
         
         self.listbox.bind("<Double-Button-1>", lambda e: self.play_selected())
 
+        # Management frame for Add/Modify Data button
+        self.management_frame_for_data_entry = ttk.Frame(self)
+        self.management_frame_for_data_entry.pack(fill=tk.X, pady=(10,0), padx=10) 
+
+        add_data_button = ttk.Button(self.management_frame_for_data_entry, text="Add/Modify Data", command=self.open_data_entry_window)
+        add_data_button.pack(side=tk.LEFT, padx=5, ipadx=10, ipady=3)
+
+        # Play controls frame
         play_controls_frame = ttk.Frame(self); play_controls_frame.pack(pady=10)
         self.play_button = ttk.Button(play_controls_frame, text="Play Selected", command=self.play_selected)
         self.play_button.pack(side="left", padx=(0, 20), ipadx=10, ipady=5)
@@ -345,9 +330,20 @@ class KpopDBBrowser(tk.Tk):
         self.change_score_checkbox = ttk.Checkbutton(play_controls_frame, text="Change Score After Play", variable=self.change_score_var)
         self.change_score_checkbox.pack(side="left", padx=(20, 0))
 
+        # Status bar (packed last to ensure it's at the very bottom)
         status_font = ("Arial", 16, "bold") 
         status = tk.Label(self, textvariable=self.status_var, relief="sunken", anchor="w", font=status_font, bg=ACCENT, fg=BRIGHT_FG, padx=8, pady=6)
-        status.pack(fill="x", side="bottom"); self.status_var.set("Ready.")
+        status.pack(fill="x", side="bottom")
+        self.status_var.set("Ready.")
+
+
+    def open_data_entry_window(self):
+        if self.data_entry_window_instance and self.data_entry_window_instance.winfo_exists():
+            self.data_entry_window_instance.lift()
+            self.data_entry_window_instance.focus_set()
+            messagebox.showinfo("Window Open", "The Data Entry window is already open.", parent=self)
+        else:
+            self.data_entry_window_instance = data_entry_ui.DataEntryWindow(self)
 
     def disable_play_buttons(self):
         if self.play_button: self.play_button.config(state=tk.DISABLED)
@@ -362,39 +358,25 @@ class KpopDBBrowser(tk.Tk):
         self.update_list()
 
     def load_artists(self):
-        cur = self.conn.cursor()
-        cur.execute("SELECT artist_id, artist_name FROM artists ORDER BY artist_name")
-        self.artists_list = [{'id': row[0], 'name': row[1]} for row in cur.fetchall()]
+        self.artists_list = db_operations.get_all_artists() 
         artist_names = [""] + [artist['name'] for artist in self.artists_list]
         self.artist_dropdown["values"] = artist_names
-        if artist_names: self.artist_var.set(artist_names[0])
+        if artist_names: 
+            self.artist_var.set(artist_names[0])
 
     def load_performances(self):
         self.status_var.set("Loading performances from database..."); self.update_idletasks()
-        query = """
-            SELECT
-                p.performance_id, p.title, p.performance_date, p.show_type, p.resolution,
-                p.file_path1, p.file_path2, p.file_url, p.score,
-                (SELECT GROUP_CONCAT(a.artist_name, ', ')
-                 FROM artists a JOIN performance_artist_link pal ON a.artist_id = pal.artist_id
-                 WHERE pal.performance_id = p.performance_id ORDER BY pal.artist_order, a.artist_name) AS artists_concatenated,
-                (SELECT GROUP_CONCAT(s.song_title, ', ')
-                 FROM songs s JOIN song_performance_link spl ON s.song_id = spl.song_id
-                 WHERE spl.performance_id = p.performance_id) AS songs_concatenated
-            FROM performances p
-            ORDER BY p.performance_date DESC, p.performance_id DESC;
-        """
-        cur = self.conn.cursor(); cur.execute(query)
+        raw_rows = db_operations.get_all_performances_raw()
         
         self.all_performances_data = []
-        for row in cur.fetchall():
+        for row in raw_rows: 
             perf_dict = {
                 "performance_id": row[0], "db_title": row[1] or "", "performance_date": row[2] or "N/A",
                 "show_type": row[3] or "N/A", "resolution": row[4] or "N/A",
                 "file_path1": row[5], "file_path2": row[6], "file_url": row[7], "score": row[8],
                 "artists_str": row[9] or "N/A", "songs_str": row[10] or "N/A" 
             }
-            path, is_yt = KpopDBBrowser.get_playable_path_info(perf_dict)
+            path, is_yt = utils.get_playable_path_info(perf_dict) 
             perf_dict["playable_path"] = path; perf_dict["is_youtube"] = is_yt
             self.all_performances_data.append(perf_dict)
             
@@ -568,7 +550,7 @@ class KpopDBBrowser(tk.Tk):
                 msg = f"Accessing local: {first_basename} (1 of {num_local}). Waking drive..."
                 if app_instance.winfo_exists(): app_instance.after(0, lambda: app_instance.status_var.set(msg))
                 with open(first_local_file, "rb") as f: f.read(1)
-                mpv_proc = subprocess.Popen([MPV_PLAYER_PATH] + local_file_paths_list)
+                mpv_proc = subprocess.Popen([config.MPV_PLAYER_PATH] + local_file_paths_list)
                 mpv_played_count = num_local
                 if app_instance.winfo_exists():
                     status = f"Playing local: {first_basename}" if num_local == 1 else \
@@ -578,7 +560,7 @@ class KpopDBBrowser(tk.Tk):
                 if app_instance.winfo_exists(): app_instance.after(0, lambda: app_instance.status_var.set(f"Finished playing {num_local} local file(s)."))
             except FileNotFoundError:
                  if app_instance.winfo_exists():
-                    err_msg = f"MPV player ('{MPV_PLAYER_PATH}') not found OR file access error for '{first_local_file}'."
+                    err_msg = f"MPV player ('{config.MPV_PLAYER_PATH}') not found OR file access error for '{first_local_file}'."
                     app_instance.after(0, lambda: messagebox.showerror("Playback Error", err_msg, parent=app_instance))
                     app_instance.after(0, lambda: app_instance.status_var.set(f"Error: {err_msg}")); mpv_played_count = 0
             except Exception as e:
@@ -667,9 +649,16 @@ class KpopDBBrowser(tk.Tk):
         if not played_performance_details_dicts: 
             messagebox.showinfo("No Details", "No performance details available to edit scores.", parent=self); return
         
+        current_db_conn = db_operations.get_db_connection()
+        if not current_db_conn:
+            messagebox.showerror("Database Error", "Cannot open score editor: No database connection.", parent=self)
+            return
+
         prefix = "Randomly Played" if is_random_source else "Selected"
         self.score_editor_window = ScoreEditorWindow(self, f"{prefix} Items - Score Editor", 
-                                                     played_performance_details_dicts, self.conn, self.refresh_data_and_ui)
+                                                     played_performance_details_dicts, 
+                                                     current_db_conn, 
+                                                     self.refresh_data_and_ui)
 
     def refresh_data_and_ui(self):
         if self.score_editor_window and not self.score_editor_window.winfo_exists():
@@ -685,8 +674,11 @@ class KpopDBBrowser(tk.Tk):
         
         local_paths_for_wake = []
         for perf_data in self.all_performances_data:
-            if perf_data.get("file_path1") and os.path.exists(perf_data["file_path1"]): local_paths_for_wake.append(perf_data["file_path1"])
-            if perf_data.get("file_path2") and os.path.exists(perf_data["file_path2"]): local_paths_for_wake.append(perf_data["file_path2"])
+            playable_path = perf_data.get("playable_path")
+            is_url = perf_data.get("file_url") and playable_path == perf_data.get("file_url")
+            if playable_path and not is_url: 
+                 local_paths_for_wake.append(playable_path)
+        
         if not local_paths_for_wake: return
 
         unique_dirs = sorted(list(set(os.path.dirname(p) for p in local_paths_for_wake if p and os.path.dirname(p))))
@@ -731,14 +723,72 @@ class KpopDBBrowser(tk.Tk):
                 else: msg += " Ready."
                 app_instance.after(0, lambda: app_instance.status_var.set(msg))
 
+    
+
+    def open_data_entry_window(self):
+        if self.data_entry_window_instance and self.data_entry_window_instance.winfo_exists():
+            self.data_entry_window_instance.lift()
+            self.data_entry_window_instance.focus_set()
+            messagebox.showinfo("Window Open", "The Data Entry window is already open.", parent=self)
+        else:
+            # Pass the db_operations module to the DataEntryWindow
+            self.data_entry_window_instance = data_entry_ui.DataEntryWindow(
+                self, 
+                db_ops=db_operations # Pass the imported module
+            )
+    
+    
     def on_closing(self): 
         if self.score_editor_window and self.score_editor_window.winfo_exists():
-            self.score_editor_window.cancel()
+            self.score_editor_window.cancel() 
             if self.score_editor_window and self.score_editor_window.winfo_exists():
                 self.score_editor_window.destroy_and_clear_master_ref()
-        self.conn.close(); self.destroy()
+                self.score_editor_window = None 
+        
+        if self.data_entry_window_instance and self.data_entry_window_instance.winfo_exists():
+            self.data_entry_window_instance.close_window()
+            self.data_entry_window_instance = None
+
+        db_operations.close_db_connection()
+        
+        try:
+            super().destroy() 
+        except tk.TclError as e:
+            print(f"TclError during main window destroy: {e}. (Often benign on final exit)")
+        except Exception as e:
+            print(f"Other error during main window destroy: {e}")
 
 if __name__ == "__main__":
-    app = KpopDBBrowser()
-    app.protocol("WM_DELETE_WINDOW", app.on_closing)
-    app.mainloop()
+    try:
+        mount_script_path = "/home/david/mount_windows_shares.sh" # Verify this path
+        if os.path.exists(mount_script_path):
+            process = subprocess.run(
+                [mount_script_path],
+                check=False, capture_output=True, text=True, timeout=15 
+            )
+            if process.returncode != 0:
+                error_message = f"Could not mount Windows shares!\nScript: {mount_script_path}\nOutput:\n{process.stdout}\n{process.stderr}\n\nThe program will now exit."
+                show_startup_error_and_exit("Mount Error", error_message)
+            print("Windows shares mounted (or already mounted).")
+        else:
+            error_message = f"Mount script '{mount_script_path}' not found.\nThe program will now exit."
+            show_startup_error_and_exit("Mount Error", error_message)
+
+    except FileNotFoundError:
+        error_message = f"Mount script '{mount_script_path}' not found (FileNotFoundError for subprocess).\nThe program will now exit."
+        show_startup_error_and_exit("Mount Error", error_message)
+    except subprocess.TimeoutExpired:
+        error_message = "Mount script timed out after 15 seconds.\nThe program will now exit."
+        show_startup_error_and_exit("Mount Error", error_message)
+    except Exception as e: 
+        error_message = f"An unexpected error occurred during mounting: {e}\nThe program will now exit."
+        show_startup_error_and_exit("Mount Error", error_message)
+    
+    try:
+        app = KpopDBBrowser() 
+        app.protocol("WM_DELETE_WINDOW", app.on_closing)
+        app.mainloop()
+    except Exception as e:
+        print(f"CRITICAL ERROR in __main__ GUI phase: {e}")
+        import traceback
+        traceback.print_exc()
