@@ -1,13 +1,16 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+import config
+DB_FILE = config.DATABASE_FILE
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import sqlite3
-import os
 import time
 import json
 from datetime import datetime, timezone
 
 # --- Configuration ---
-DB_FILE = "spotify_data.db"
 CREDENTIALS_FILE_PATH = os.path.expanduser("~/.spotify_credentials")
 # New state file for artist detail enrichment
 ARTIST_ENRICH_STATE_FILE_PATH = "spotify_artist_enrich_state.json"

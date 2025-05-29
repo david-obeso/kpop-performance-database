@@ -1,13 +1,17 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+import config
+DB_FILE = config.DATABASE_FILE
+
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import sqlite3
-import os
 import time
 import json
 from datetime import datetime, timezone
 
 # --- Configuration ---
-DB_FILE = "spotify_data.db"
 CREDENTIALS_FILE_PATH = os.path.expanduser("~/.spotify_credentials")
 STATE_FILE_PATH = "spotify_album_sync_state.json" # Stores the last offset
 SPOTIPY_REDIRECT_URI = "http://127.0.0.1:8888/callback"

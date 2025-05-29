@@ -1,0 +1,11 @@
+For **refreshing the artist list from Spotify** (i.e., updating the list of artists in your main database), it should be called the script that **imports or updates the artist list itself**.
+
+- spotify_album_importer.py  
+  - **Purpose:** Imports albums and their associated artists from your Spotify library.  
+  - **Effect:** Adds new artists (and albums) to your main database.
+
+- spotify_artist_info_importer.py  
+  - **Purpose:** Enriches existing artists in your database with additional info (images, popularity, followers, etc).  
+  - **Effect:** Updates details for artists that are already present.
+
+

@@ -723,7 +723,19 @@ class KpopDBBrowser(tk.Tk):
                 else: msg += " Ready."
                 app_instance.after(0, lambda: app_instance.status_var.set(msg))
 
-    
+    def update_artists_from_spotify(self):
+        base_dir = os.path.dirname(__file__)
+        album_importer = os.path.join(base_dir, "accesories/spotify_data/spotify_album_importer.py")
+        artist_info_importer = os.path.join(base_dir, "accesories/spotify_data/spotify_artist_info_importer.py")
+        try:
+            subprocess.run([sys.executable, album_importer], check=True)
+            subprocess.run([sys.executable, artist_info_importer], check=True)
+            self.load_initial_data()
+            messagebox.showinfo("Artists Updated", "Artists have been updated and enriched from Spotify.", parent=self)
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Error", f"Failed to update artists from Spotify.\n\nScript exited with code {e.returncode}. See terminal for details.", parent=self)
+        except Exception as e:
+            messagebox.showerror("Error", f"Unexpected error: {e}", parent=self)
 
     def open_data_entry_window(self):
         if self.data_entry_window_instance and self.data_entry_window_instance.winfo_exists():
