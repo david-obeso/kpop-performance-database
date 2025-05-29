@@ -4,6 +4,13 @@ from tkinter import ttk, messagebox
 import subprocess
 import sys
 import os
+import webbrowser
+import datetime
+try:
+    from tkcalendar import DateEntry
+    HAS_TKCALENDAR = True
+except ImportError:
+    HAS_TKCALENDAR = False
 
 # Modularized imports (will be needed later if not already passed, e.g. config)
 # import config
@@ -71,6 +78,12 @@ class DataEntryWindow(tk.Toplevel):
 
         self.entry_type_var = tk.StringVar(value="performance")
         self.source_type_var = tk.StringVar(value="url")
+        self.title_var = tk.StringVar()
+
+        # Added date variable
+        self.date_var = tk.StringVar()
+        today = datetime.date.today()
+        self.date_var.set(today.strftime("%Y-%m-%d"))
 
         selection_outer_frame = ttk.Frame(main_frame, style="DataEntry.TFrame")
         selection_outer_frame.pack(pady=0, fill="x")
@@ -99,6 +112,8 @@ class DataEntryWindow(tk.Toplevel):
         self.primary_artist_var = tk.StringVar()
         self.secondary_artist_var = tk.StringVar()
         self.all_artists_list = [] 
+        self.selected_song_ids = []  # List of selected song_id
+        self.selected_song_titles = []  # Parallel list of song titles for display
 
         button_frame = ttk.Frame(main_frame, style="DataEntry.TFrame")
         button_frame.pack(fill="x", pady=(10, 0), side=tk.BOTTOM)
@@ -113,6 +128,8 @@ class DataEntryWindow(tk.Toplevel):
         self.load_initial_data() 
         self.focus_set()
 
+        self.url_entry_var.trace_add("write", self.on_url_change)
+
     def load_initial_data(self):
         self.all_artists_list = self.db_ops.get_all_artists()
         # Sort the list of dicts by 'name', case-insensitive
@@ -121,9 +138,14 @@ class DataEntryWindow(tk.Toplevel):
     def reset_content_on_selection_change(self):
         for widget in self.content_area_frame.winfo_children():
             widget.destroy()
-        self.current_content_placeholder_label = ttk.Label(self.content_area_frame, text="Selections changed. Click 'Proceed / Next Step'.", style="DataEntry.TLabel")
+        self.current_content_placeholder_label = ttk.Label(
+            self.content_area_frame,
+            text="Selections changed. Click 'Proceed / Next Step'.",
+            style="DataEntry.TLabel"
+        )
         self.current_content_placeholder_label.pack(padx=10, pady=20, anchor="center")
         self.url_entry_var.set("")
+        self.proceed_button.config(state=tk.NORMAL)  # <-- Always enable here
 
     def handle_proceed(self):
         entry_type = self.entry_type_var.get()
@@ -134,10 +156,10 @@ class DataEntryWindow(tk.Toplevel):
 
         print(f"Proceeding with: Entry={entry_type}, Source={source_type}") # Keep for console feedback
 
-        if entry_type == "performance" and source_type == "url":
-            self.build_url_entry_ui(item_name="Performance")
-        elif entry_type == "music_video" and source_type == "url":
-            self.build_url_entry_ui(item_name="Music Video")
+        if entry_type in ("performance", "music_video") and source_type == "url":
+            self.build_url_entry_ui(item_name="Performance" if entry_type == "performance" else "Music Video")
+            if self.all_fields_filled():
+                self.confirm_and_save_entry(entry_type)
         else:
             ttk.Label(self.content_area_frame,
                       text=f"Placeholder UI for:\nEntry Type: {entry_type.replace('_', ' ').title()}\nSource Type: {source_type.replace('_', ' ').title()}",
@@ -190,8 +212,9 @@ class DataEntryWindow(tk.Toplevel):
         url_entry.pack(fill="x", pady=(0,5))
         self.after(100, lambda: url_entry.focus_set()) 
 
-        check_url_button = ttk.Button(url_frame, text="Check URL", command=self.check_entered_url, style="DataEntry.TButton")
-        check_url_button.pack(anchor="e", pady=2)
+        # Remove the Check URL button, keep only the GO button
+        go_button = ttk.Button(url_frame, text="GO", command=self.open_url_in_browser, style="DataEntry.TButton")
+        go_button.pack(anchor="e", pady=2)
 
         artist_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")  # <-- FIXED HERE
         artist_frame.pack(fill="x", pady=6)
@@ -246,6 +269,46 @@ class DataEntryWindow(tk.Toplevel):
                 artist_frame, text="Remove", command=self.remove_secondary_artist, style="DataEntry.TButton"
             )
             remove_secondary_btn.grid(row=2, column=3, sticky="w", padx=(4,2))
+
+        # SONG SELECTION SECTION
+        song_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
+        song_frame.pack(fill="x", pady=(10,0))
+
+        ttk.Label(song_frame, text="Song(s):", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
+
+        # Show selected songs
+        if self.selected_song_titles:
+            for idx, title in enumerate(self.selected_song_titles):
+                ttk.Label(song_frame, text=title, style="DataEntry.TLabel").grid(row=idx+1, column=1, sticky="w", padx=(10,2))
+                remove_btn = ttk.Button(song_frame, text="Remove", style="DataEntry.TButton",
+                                        command=lambda i=idx: self.remove_selected_song(i))
+                remove_btn.grid(row=idx+1, column=2, padx=(4,2), sticky="w")
+        else:
+            ttk.Label(song_frame, text="No songs selected.", style="DataEntry.TLabel").grid(row=1, column=1, sticky="w", padx=(10,2))
+
+        add_song_btn = ttk.Button(song_frame, text="Add Song(s)", style="DataEntry.TButton", command=self.show_song_selection_popup)
+        add_song_btn.grid(row=0, column=2, padx=(4,2), sticky="w")
+
+        title_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
+        title_frame.pack(fill="x", pady=(10,0))
+
+        ttk.Label(title_frame, text="Title:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
+        title_entry = ttk.Entry(title_frame, textvariable=self.title_var, width=70, style="DataEntry.TEntry")
+        title_entry.grid(row=0, column=1, sticky="ew", pady=2, padx=(2,0))
+        title_frame.columnconfigure(1, weight=1)
+
+        # DATE ENTRY SECTION
+        date_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
+        date_frame.pack(fill="x", pady=(10,0))
+
+        ttk.Label(date_frame, text="Date:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
+        if HAS_TKCALENDAR:
+            date_entry = DateEntry(date_frame, textvariable=self.date_var, date_pattern="yyyy-mm-dd", width=12, font=FONT_ENTRY_DATA_UI)
+            date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
+        else:
+            date_entry = ttk.Entry(date_frame, textvariable=self.date_var, width=12, style="DataEntry.TEntry")
+            date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
+        ttk.Label(date_frame, text="(YYYY-MM-DD)", style="DataEntry.TLabel").grid(row=0, column=2, sticky="w", padx=(8,2))
 
         ttk.Label(step_frame, text="Next: Song Selection...", style="DataEntry.TLabel").pack(anchor="w", pady=(15,0))
 
@@ -418,3 +481,157 @@ class DataEntryWindow(tk.Toplevel):
     def remove_secondary_artist(self):
         self.secondary_artist_var.set("")
         self.build_url_entry_ui(item_name="Performance" if self.entry_type_var.get() == "performance" else "Music Video")
+
+    def get_songs_for_selected_artists(self):
+        # Get artist IDs
+        artist_names = [self.primary_artist_var.get()]
+        if self.secondary_artist_var.get().strip():
+            artist_names.append(self.secondary_artist_var.get())
+        artist_ids = []
+        for name in artist_names:
+            for artist in self.all_artists_list:
+                if artist['name'] == name:
+                    artist_ids.append(artist['id'])
+        if not artist_ids:
+            return []
+
+        # Query songs for these artist_ids
+        placeholders = ",".join("?" for _ in artist_ids)
+        query = f"""
+            SELECT DISTINCT s.song_id, s.song_title
+            FROM songs s
+            JOIN song_artist_link sal ON s.song_id = sal.song_id
+            WHERE sal.artist_id IN ({placeholders})
+            ORDER BY s.song_title COLLATE NOCASE
+        """
+        conn = self.db_ops.get_db_connection()
+        if not conn:
+            return []
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, artist_ids)
+            return cursor.fetchall()  # List of (song_id, song_title)
+        except Exception as e:
+            print(f"Error fetching songs for artists: {e}")
+            return []
+
+    def show_song_selection_popup(self):
+        songs = self.get_songs_for_selected_artists()
+        if not songs:
+            messagebox.showinfo("No Songs", "No songs found for the selected artist(s).", parent=self)
+            return
+
+        popup = tk.Toplevel(self)
+        popup.title("Select Song(s)")
+        popup.configure(bg=DARK_BG)
+        popup.geometry("400x500+%d+%d" % (self.winfo_rootx()+140, self.winfo_rooty()+140))
+        popup.transient(self)
+        popup.grab_set()
+
+        frame = tk.Frame(popup, bg=DARK_BG)
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        scrollbar = tk.Scrollbar(frame, orient="vertical")
+        listbox = tk.Listbox(
+            frame, font=FONT_MAIN, bg="#333a40", fg=BRIGHT_FG, selectbackground=ACCENT,
+            selectforeground="#f1fa8c", activestyle="none", highlightthickness=0,
+            yscrollcommand=scrollbar.set, selectmode=tk.MULTIPLE
+        )
+        scrollbar.config(command=listbox.yview)
+        scrollbar.pack(side="right", fill="y")
+        listbox.pack(side="left", fill="both", expand=True)
+
+        song_id_title = [(str(song_id), title) for song_id, title in songs]
+        for song_id, title in song_id_title:
+            listbox.insert(tk.END, title)
+
+        # Pre-select already selected songs
+        for idx, (song_id, title) in enumerate(song_id_title):
+            if int(song_id) in self.selected_song_ids:
+                listbox.selection_set(idx)
+
+        def on_ok():
+            selected_indices = listbox.curselection()
+            self.selected_song_ids = [int(song_id_title[i][0]) for i in selected_indices]
+            self.selected_song_titles = [song_id_title[i][1] for i in selected_indices]
+            popup.destroy()
+            self.build_url_entry_ui(item_name="Performance" if self.entry_type_var.get() == "performance" else "Music Video")
+            self.update_title_from_songs()  # Update title after song selection
+
+        def on_cancel():
+            popup.destroy()
+
+        btn_frame = tk.Frame(popup, bg=DARK_BG)
+        btn_frame.pack(fill="x", pady=(10,0))
+        ok_btn = ttk.Button(btn_frame, text="OK", command=on_ok, style="DataEntry.TButton")
+        ok_btn.pack(side=tk.RIGHT, padx=4)
+        cancel_btn = ttk.Button(btn_frame, text="Cancel", command=on_cancel, style="DataEntry.TButton")
+        cancel_btn.pack(side=tk.RIGHT, padx=4)
+
+        listbox.focus_set()
+
+    def remove_selected_song(self, idx):
+        if 0 <= idx < len(self.selected_song_ids):
+            del self.selected_song_ids[idx]
+            del self.selected_song_titles[idx]
+            self.build_url_entry_ui(item_name="Performance" if self.entry_type_var.get() == "performance" else "Music Video")
+
+    def on_url_change(self, *args):
+        url = self.url_entry_var.get()
+        if url.startswith("http://") or url.startswith("https://"):
+            self.proceed_button.config(state=tk.NORMAL)
+        else:
+            self.proceed_button.config(state=tk.DISABLED)
+
+    def open_url_in_browser(self):
+        url = self.url_entry_var.get()
+        if url.startswith("http://") or url.startswith("https://"):
+            webbrowser.open(url)
+        else:
+            messagebox.showerror("Invalid URL", "Please enter a valid URL (starting with http:// or https://).", parent=self)
+
+    def update_title_from_songs(self):
+        # Only auto-update if the user hasn't changed it manually (optional: add a flag if you want)
+        self.title_var.set(", ".join(self.selected_song_titles))
+
+    def confirm_and_save_entry(self, entry_type):
+        # Gather all data
+        url = self.url_entry_var.get()
+        primary_artist = self.primary_artist_var.get()
+        secondary_artist = self.secondary_artist_var.get().strip() or None
+        songs = self.selected_song_titles
+        title = self.title_var.get()
+        date = self.date_var.get()
+        score = 0 if entry_type == "music_video" else None
+
+        summary = f"Type: {entry_type.replace('_', ' ').title()}\n"
+        summary += f"URL: {url}\n"
+        summary += f"Primary Artist: {primary_artist}\n"
+        if secondary_artist:
+            summary += f"Secondary Artist: {secondary_artist}\n"
+        summary += f"Songs: {', '.join(songs)}\n"
+        summary += f"Title: {title}\n"
+        summary += f"Date: {date}\n"
+        if entry_type == "music_video":
+            summary += f"Score: 0 (fixed)\n"
+        else:
+            summary += f"Score: (to be set later)\n"
+
+        if messagebox.askokcancel("Confirm Entry", f"Please confirm the following data:\n\n{summary}", parent=self):
+            try:
+                if entry_type == "music_video":
+                    self.db_ops.insert_music_video(
+                        title=title,
+                        release_date=date,
+                        file_url=url,
+                        score=0,
+                        artist_names=[primary_artist] + ([secondary_artist] if secondary_artist else []),
+                        song_ids=self.selected_song_ids
+                    )
+                else:
+                    # For performance, call a similar db_ops.insert_performance(...)
+                    pass
+                messagebox.showinfo("Success", "Entry saved to database.", parent=self)
+                self.close_window()
+            except Exception as e:
+                messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)

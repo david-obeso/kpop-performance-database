@@ -87,3 +87,29 @@ def get_all_performances_raw():
     except AttributeError as e: 
         print(f"AttributeError in get_all_performances_raw (likely conn is None): {e}")
     return performances_raw
+
+def insert_music_video(title, release_date, file_url, score, artist_names, song_ids):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO music_videos (title, release_date, file_url, score) VALUES (?, ?, ?, ?)",
+        (title, release_date, file_url, score)
+    )
+    mv_id = cursor.lastrowid
+    # Link artists
+    for idx, artist_name in enumerate(artist_names):
+        cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
+        row = cursor.fetchone()
+        if row:
+            artist_id = row[0]
+            cursor.execute(
+                "INSERT INTO music_video_artist_link (mv_id, artist_id, artist_order) VALUES (?, ?, ?)",
+                (mv_id, artist_id, idx+1)
+            )
+    # Link songs
+    for song_id in song_ids:
+        cursor.execute(
+            "INSERT INTO song_music_video_link (song_id, music_video_id) VALUES (?, ?)",
+            (song_id, mv_id)
+        )
+    conn.commit()
