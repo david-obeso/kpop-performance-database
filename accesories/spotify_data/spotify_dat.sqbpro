@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="spotify_data" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="pragmas query structure" current="2"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="125"/><column_width id="3" width="7260"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><table title="album_artist_link_simplified" custom_title="0" dock_id="2" table="4,28:mainalbum_artist_link_simplified"/><dock_state state="000000ff00000000fd0000000100000002000009cf000004effc0100000002fb000000160064006f0063006b00420072006f0077007300650031010000000000000a680000000000000000fb000000160064006f0063006b00420072006f00770073006500320100000000000009cf0000012c00ffffff000003540000000000000004000000040000000800000008fc00000000"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="album_artist_link_simplified" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_" freeze_columns="0"><sort/><column_widths><column index="1" value="80"/><column index="2" value="74"/><column index="3" value="105"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="SQL 1">CREATE TABLE &quot;artists&quot; (
+    &quot;artist_id&quot; INTEGER PRIMARY KEY AUTOINCREMENT,
+    &quot;artist_name&quot; TEXT NOT NULL UNIQUE,
+    &quot;spotify_artist_id&quot; TEXT UNIQUE, -- Spotify's unique ID for the artist
+    &quot;artist_image_url&quot; TEXT,         -- URL of artist's image (Spotify provides this)
+    &quot;popularity&quot; INTEGER,            -- Spotify's popularity score (0-100)
+    &quot;followers_total&quot; INTEGER,       -- Total number of followers on Spotify
+    &quot;spotify_artist_uri&quot; TEXT,       -- Spotify URI for the artist
+    &quot;last_checked_at&quot; TEXT           -- Timestamp (ISO8601) of when this record was last synced/verified
+);
+
+CREATE TABLE &quot;albums&quot; (
+    &quot;album_id&quot; INTEGER PRIMARY KEY AUTOINCREMENT,
+    &quot;album_title&quot; TEXT NOT NULL,
+    &quot;spotify_album_id&quot; TEXT UNIQUE NOT NULL, -- Spotify's unique ID for the album
+    &quot;album_type&quot; TEXT,                       -- e.g., 'album', 'single', 'compilation'
+    &quot;total_tracks&quot; INTEGER,                  -- Total tracks on the album
+    &quot;release_date&quot; TEXT,                     -- Release date (YYYY-MM-DD, YYYY-MM, or YYYY)
+    &quot;release_date_precision&quot; TEXT,           -- 'day', 'month', or 'year'
+    &quot;label&quot; TEXT,                            -- Record label
+    &quot;popularity&quot; INTEGER,                    -- Spotify's popularity score (0-100)
+    &quot;cover_image_url&quot; TEXT,                  -- URL of album cover art (Spotify provides this)
+    &quot;spotify_album_uri&quot; TEXT,                -- Spotify URI for the album
+    &quot;spotify_added_at&quot; TEXT NOT NULL,        -- Timestamp (ISO8601) when user added album to library (for &quot;timeshot&quot;)
+    &quot;last_checked_at&quot; TEXT                   -- Timestamp (ISO8601) of when this record was last synced/verified
+);
+
+CREATE TABLE &quot;songs&quot; (
+    &quot;song_id&quot; INTEGER PRIMARY KEY AUTOINCREMENT,
+    &quot;song_title&quot; TEXT NOT NULL,
+    &quot;spotify_song_id&quot; TEXT UNIQUE NOT NULL, -- Spotify's unique ID for the track
+    &quot;duration_ms&quot; INTEGER,                  -- Duration of the song in milliseconds
+    &quot;is_explicit&quot; INTEGER,                  -- Boolean (0 or 1) if the track has explicit content
+    &quot;spotify_track_uri&quot; TEXT,               -- Spotify URI for the track
+    &quot;last_checked_at&quot; TEXT                  -- Timestamp (ISO8601) of when this record was last synced/verified
+);
+
+-- Junction table for the many-to-many relationship between Albums and Artists
+
+
+CREATE TABLE &quot;album_artist_link_simplified&quot; (
+    &quot;album_id&quot; INTEGER NOT NULL,
+    &quot;artist_id&quot; INTEGER NOT NULL,
+    &quot;artist_order&quot; INTEGER DEFAULT 1, -- Use this to indicate primary (1), secondary (2), etc.
+    PRIMARY KEY (&quot;album_id&quot;, &quot;artist_id&quot;),
+    FOREIGN KEY (&quot;album_id&quot;) REFERENCES &quot;albums&quot;(&quot;album_id&quot;) ON DELETE CASCADE,
+    FOREIGN KEY (&quot;artist_id&quot;) REFERENCES &quot;artists&quot;(&quot;artist_id&quot;) ON DELETE CASCADE
+);
+
+
+-- Junction table for the many-to-many relationship between Songs and Artists
+CREATE TABLE &quot;song_artist_link&quot; (
+    &quot;song_id&quot; INTEGER NOT NULL,
+    &quot;artist_id&quot; INTEGER NOT NULL,
+    &quot;artist_order&quot; INTEGER DEFAULT 1, -- To store the order of artists if multiple
+    PRIMARY KEY (&quot;song_id&quot;, &quot;artist_id&quot;), -- Assuming an artist is listed once per song
+    FOREIGN KEY (&quot;song_id&quot;) REFERENCES &quot;songs&quot;(&quot;song_id&quot;) ON DELETE CASCADE,
+    FOREIGN KEY (&quot;artist_id&quot;) REFERENCES &quot;artists&quot;(&quot;artist_id&quot;) ON DELETE CASCADE
+);
+
+-- Junction table for the many-to-many relationship between Songs and Albums
+-- This table signifies that a particular song appears on a particular album.
+-- It also stores context-specific information like track number.
+CREATE TABLE &quot;song_album_link&quot; (
+    &quot;song_id&quot; INTEGER NOT NULL,
+    &quot;album_id&quot; INTEGER NOT NULL,
+    &quot;track_number&quot; INTEGER NOT NULL,        -- The track number of the song on this specific album
+    &quot;disc_number&quot; INTEGER DEFAULT 1,        -- The disc number of the song on this specific album
+    PRIMARY KEY (&quot;song_id&quot;, &quot;album_id&quot;),
+    FOREIGN KEY (&quot;song_id&quot;) REFERENCES &quot;songs&quot;(&quot;song_id&quot;) ON DELETE CASCADE,
+    FOREIGN KEY (&quot;album_id&quot;) REFERENCES &quot;albums&quot;(&quot;album_id&quot;) ON DELETE CASCADE
+);</sql><current_tab id="0"/></tab_sql></sqlb_project>

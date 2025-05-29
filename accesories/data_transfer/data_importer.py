@@ -3,6 +3,7 @@ import os # We'll use this for file paths
 import sqlite3 # Importing sqlite3 for future database operations
 from sqlite3 import Error # <--- Import the Error class for better error handling
 import re # Import regular expression module for path conversion
+import subprocess
 
 # --- Configuration ---
 EXCEL_FILE_PATH = "/home/david/kpop-performance-database/KpopDatabase.xlsm" # The path to the Excel file
@@ -22,7 +23,8 @@ SQL_CREATE_GROUPS_TABLE = """ CREATE TABLE IF NOT EXISTS groups (
                                     group_id INTEGER PRIMARY KEY,
                                     group_name TEXT NOT NULL UNIQUE,
                                     group_profile TEXT,
-                                    picture_path TEXT
+                                    picture_path TEXT,
+                                    spotify_artist_id TEXT
                                 ); """
 
 SQL_CREATE_MEMBERS_TABLE = """CREATE TABLE IF NOT EXISTS members (
@@ -197,9 +199,17 @@ def create_table(conn, create_table_sql):
 # --- Main Script ---
 
 def main():
-    """
-    Main function to setup database, read Excel, process data, and insert.
-    """
+    # --- Sync OneDrive before reading Excel ---
+    print("--- Syncing OneDrive to get the latest Excel file ---")
+    try:
+        subprocess.run(
+            ["/usr/local/bin/onedrive", "--sync", "--download-only"],
+            check=True
+        )
+        print("OneDrive sync completed.")
+    except Exception as e:
+        print(f"Warning: Could not sync OneDrive: {e}")
+
     print("--- Database Setup ---")
     conn = create_connection(DATABASE_FILE)
 
@@ -212,6 +222,7 @@ def main():
         create_table(conn, SQL_CREATE_PERFORMANCE_SONGS_TABLE)
         create_table(conn, SQL_CREATE_MUSIC_VIDEOS_TABLE)
         create_table(conn, SQL_CREATE_FANCAMS_TABLE)
+        create_table(conn, SQL_CREATE_SONG_ARTISTS_TABLE)
         print("Database tables checked/created.")
     else:
         print("Error! Cannot create the database connection. Exiting.")
