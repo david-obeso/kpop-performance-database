@@ -1,0 +1,133 @@
+ music_videos (
+    mv_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,                 -- e.g., "Official Video for Song X"
+    release_date TEXT,                   -- YYYY-MM-DD
+    file_path1 TEXT UNIQUE,              -- Path on computer 1 (can be NULL)
+    file_path2 TEXT UNIQUE,              -- Path on computer 2 (can be NULL)
+    file_url TEXT UNIQUE,                -- URL to the file (can be NULL)
+    score INTEGER,                       -- User rating
+    last_checked_at TEXT,                -- Timestamp (ISO8601) of when this record was last synced/verified (Consider adding this for consistency)
+    CONSTRAINT chk_mv_location CHECK (file_path1 IS NOT NULL OR file_path2 IS NOT NULL OR file_url IS NOT NULL)
+    
+ music_video_artist_link (
+    mv_id INTEGER NOT NULL,
+    artist_id INTEGER NOT NULL,
+    artist_order INTEGER DEFAULT 1, -- Primary (1), featured (2), etc.
+    PRIMARY KEY (mv_id, artist_id),
+    FOREIGN KEY (mv_id) REFERENCES music_videos (mv_id) ON DELETE CASCADE,
+    -- If a music video is deleted, remove its links to artists.
+    FOREIGN KEY (artist_id) REFERENCES artists (artist_id) ON DELETE CASCADE
+    -- If an artist is deleted, remove their links to music videos.
+    -- The music video record itself will NOT be deleted.
+);
+
+ song_music_video_link (
+    "song_id" INTEGER NOT NULL,
+    "music_video_id" INTEGER NOT NULL, -- Renamed from mv_id to be consistent with the column name in music_videos table it references (mv_id)
+    PRIMARY KEY ("song_id", "music_video_id"),
+    FOREIGN KEY ("song_id") REFERENCES "songs" ("song_id") ON DELETE CASCADE,
+    FOREIGN KEY ("music_video_id") REFERENCES "music_videos" ("mv_id") ON DELETE CASCADE
+);
+
+  
+ artists (
+    "artist_id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "artist_name" TEXT NOT NULL UNIQUE,
+    "spotify_artist_id" TEXT UNIQUE, -- Spotify's unique ID for the artist
+    "artist_image_url" TEXT, -- URL of artist's image (Spotify provides this)
+    "popularity" INTEGER, -- Spotify's popularity score (0-100)
+    "followers_total" INTEGER, -- Total number of followers on Spotify
+    "spotify_artist_uri" TEXT, -- Spotify URI for the artist
+    "last_checked_at" TEXT -- Timestamp (ISO8601) of when this record was last synced/verified
+  )
+  
+  
+ albums (
+    "album_id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "album_title" TEXT NOT NULL,
+    "spotify_album_id" TEXT UNIQUE NOT NULL, -- Spotify's unique ID for the album
+    "album_type" TEXT, -- e.g., 'album', 'single', 'compilation'
+    "total_tracks" INTEGER, -- Total tracks on the album
+    "release_date" TEXT, -- Release date (YYYY-MM-DD, YYYY-MM, or YYYY)
+    "release_date_precision" TEXT, -- 'day', 'month', or 'year'
+    "label" TEXT, -- Record label
+    "popularity" INTEGER, -- Spotify's popularity score (0-100)
+    "cover_image_url" TEXT, -- URL of album cover art (Spotify provides this)
+    "spotify_album_uri" TEXT, -- Spotify URI for the album
+    "spotify_added_at" TEXT NOT NULL, -- Timestamp (ISO8601) when user added album to library (for "timeshot")
+    "last_checked_at" TEXT -- Timestamp (ISO8601) of when this record was last synced/verified
+  )
+  
+  
+ album_artist_link_simplified (
+    "album_id" INTEGER NOT NULL,
+    "artist_id" INTEGER NOT NULL,
+    "artist_order" INTEGER DEFAULT 1, -- Use this to indicate primary (1), secondary (2), etc.
+    PRIMARY KEY ("album_id", "artist_id"),
+    FOREIGN KEY ("album_id") REFERENCES "albums" ("album_id") ON DELETE CASCADE,
+    FOREIGN KEY ("artist_id") REFERENCES "artists" ("artist_id") ON DELETE CASCADE
+  )
+  
+    
+ song_artist_link (
+    "song_id" INTEGER NOT NULL,
+    "artist_id" INTEGER NOT NULL,
+    "artist_order" INTEGER DEFAULT 1, -- To store the order of artists if multiple
+    PRIMARY KEY ("song_id", "artist_id"), -- Assuming an artist is listed once per song
+    FOREIGN KEY ("song_id") REFERENCES "songs" ("song_id") ON DELETE CASCADE,
+    FOREIGN KEY ("artist_id") REFERENCES "artists" ("artist_id") ON DELETE CASCADE
+  )
+  
+ song_album_link (
+    "song_id" INTEGER NOT NULL,
+    "album_id" INTEGER NOT NULL,
+    "track_number" INTEGER NOT NULL, -- The track number of the song on this specific album
+    "disc_number" INTEGER DEFAULT 1, -- The disc number of the song on this specific album
+    PRIMARY KEY ("song_id", "album_id"),
+    FOREIGN KEY ("song_id") REFERENCES "songs" ("song_id") ON DELETE CASCADE,
+    FOREIGN KEY ("album_id") REFERENCES "albums" ("album_id") ON DELETE CASCADE
+  )
+  
+  songs (
+    "song_id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "song_title" TEXT NOT NULL,
+    "spotify_song_id" TEXT UNIQUE NOT NULL, -- Spotify's unique ID for the track
+    "duration_ms" INTEGER, -- Duration of the song in milliseconds
+    "is_explicit" INTEGER, -- Boolean (0 or 1) if the track has explicit content
+    "spotify_track_uri" TEXT, -- Spotify URI for the track
+    "last_checked_at" TEXT -- Timestamp (ISO8601) of when this record was last synced/verified
+  )
+  
+  performances (
+    performance_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,                 -- e.g., "Live at Glastonbury 2023 - Main Stage"
+    performance_date TEXT,               -- YYYY-MM-DD
+    show_type TEXT,                      -- e.g., 'Concert', 'Festival', 'TV Appearance', 'Radio Session'
+    resolution TEXT,                     -- e.g., '1080p', '720p', '4K', 'Audio'
+    file_path1 TEXT UNIQUE,              -- Path on computer 1 (can be NULL)
+    file_path2 TEXT UNIQUE,              -- Path on computer 2 (can be NULL)
+    file_url TEXT UNIQUE,                -- URL to the file (can be NULL)
+    score INTEGER,                       -- User rating
+    last_checked_at TEXT,                -- Timestamp (ISO8601) of when this record was last synced/verified (Consider adding this for consistency)
+    CONSTRAINT chk_performance_location CHECK (file_path1 IS NOT NULL OR file_path2 IS NOT NULL OR file_url IS NOT NULL)
+);
+
+performance_artist_link (
+    performance_id INTEGER NOT NULL,
+    artist_id INTEGER NOT NULL,
+    artist_order INTEGER DEFAULT 1, -- Primary (1), featured (2), etc.
+    PRIMARY KEY (performance_id, artist_id),
+    FOREIGN KEY (performance_id) REFERENCES performances (performance_id) ON DELETE CASCADE,
+    -- If a performance is deleted, remove its links to artists.
+    FOREIGN KEY (artist_id) REFERENCES artists (artist_id) ON DELETE CASCADE
+    -- If an artist is deleted, remove their links to performances.
+    -- The performance record itself will NOT be deleted, fulfilling your requirement.
+);
+
+"song_performance_link" (
+    "song_id" INTEGER NOT NULL,
+    "performance_id" INTEGER NOT NULL,
+    PRIMARY KEY ("song_id", "performance_id"),
+    FOREIGN KEY ("song_id") REFERENCES "songs" ("song_id") ON DELETE CASCADE,
+    FOREIGN KEY ("performance_id") REFERENCES "performances" ("performance_id") ON DELETE CASCADE
+);
