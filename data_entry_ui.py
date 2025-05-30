@@ -242,9 +242,7 @@ class DataEntryWindow(tk.Toplevel):
             # Only show confirmation popup if all required fields are filled
             if self._all_mv_url_fields_filled():
                 self._show_mv_url_confirmation_popup()
-            else:
-                # Optionally, show a warning if user tries to proceed without all fields
-                messagebox.showwarning("Missing Data", "Please fill in all required fields before proceeding.", parent=self)
+            # Do nothing if not all fields are filled (no warning popup)
             return
         if entry_type in ("performance", "music_video") and source_type == "url":
             self.build_url_entry_ui(item_name="Performance" if entry_type == "performance" else "Music Video")
@@ -287,6 +285,14 @@ class DataEntryWindow(tk.Toplevel):
                     # print(f"DEBUG: Jumped to {values[i]}")
                     return 
 
+    def _add_right_click_paste(self, entry_widget):
+        """Attach a right-click context menu with Paste to the given Entry widget."""
+        menu = tk.Menu(entry_widget, tearoff=0)
+        menu.add_command(label="Paste", command=lambda: entry_widget.event_generate('<<Paste>>'))
+        def show_menu(event):
+            menu.tk_popup(event.x_root, event.y_root)
+        entry_widget.bind("<Button-3>", show_menu)
+
     def build_url_entry_ui(self, item_name):
         # Clear previous content to avoid stacking
         for widget in self.content_area_frame.winfo_children():
@@ -300,7 +306,8 @@ class DataEntryWindow(tk.Toplevel):
         ttk.Label(url_frame, text="URL:", style="DataEntry.TLabel").pack(anchor="w", pady=(0,2))
         url_entry = ttk.Entry(url_frame, textvariable=self.url_entry_var, width=70, style="DataEntry.TEntry")
         url_entry.pack(fill="x", pady=(0,5))
-        self.after(100, lambda: url_entry.focus_set()) 
+        self._add_right_click_paste(url_entry)
+        self.after(100, lambda: url_entry.focus_set())
 
         # Remove the Check URL button, keep only the GO button
         go_button = ttk.Button(url_frame, text="GO", command=self.open_url_in_browser, style="DataEntry.TButton")
@@ -385,6 +392,7 @@ class DataEntryWindow(tk.Toplevel):
         ttk.Label(title_frame, text="Title:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
         title_entry = ttk.Entry(title_frame, textvariable=self.title_var, width=70, style="DataEntry.TEntry")
         title_entry.grid(row=0, column=1, sticky="ew", pady=2, padx=(2,0))
+        self._add_right_click_paste(title_entry)
         title_frame.columnconfigure(1, weight=1)
 
         # DATE ENTRY SECTION
@@ -397,6 +405,7 @@ class DataEntryWindow(tk.Toplevel):
             self.date_var.set("")
         self.date_entry = ttk.Entry(date_frame, textvariable=self.date_var, width=12, style="DataEntry.TEntry")
         self.date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
+        self._add_right_click_paste(self.date_entry)
         ttk.Label(date_frame, text="(e.g. 240530)", style="DataEntry.TLabel").grid(row=0, column=2, sticky="w", padx=(8,2))
 
     def update_artists_from_spotify(self):
