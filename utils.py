@@ -16,11 +16,13 @@ def get_playable_path_info(perf_data_dict):
     Priority: file_path1, file_path2, file_url.
     """
     path1 = perf_data_dict.get("file_path1")
-    if path1 and os.path.exists(path1):
-        return path1, False 
+    # Temporarily assume path1 exists if the field is not empty
+    if path1: # OLD: if path1 and os.path.exists(path1):
+        return path1, False
 
     path2 = perf_data_dict.get("file_path2")
-    if path2 and os.path.exists(path2):
+    # Temporarily assume path2 exists if the field is not empty  
+    if path2: # OLD: if path2 and os.path.exists(path2):
         return path2, False
 
     file_url = perf_data_dict.get("file_url")
