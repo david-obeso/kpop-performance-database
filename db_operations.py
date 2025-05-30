@@ -134,7 +134,7 @@ def insert_music_video(title, release_date, file_url, score, artist_names, song_
 
 def get_all_music_videos_raw():
     """
-    Fetches raw music video data along with concatenated artists and songs.
+    Fetches raw music video data along with concatenated artists and songs, including file_path1 and file_path2 for local playback.
     Returns a list of tuples directly from the database query.
     """
     conn = get_db_connection()
@@ -142,7 +142,7 @@ def get_all_music_videos_raw():
         return []
     query = """
         SELECT
-            mv.mv_id, mv.title, mv.release_date, mv.file_url, mv.score,
+            mv.mv_id, mv.title, mv.release_date, mv.file_url, mv.file_path1, mv.file_path2, mv.score,
             (SELECT GROUP_CONCAT(a.artist_name, ', ')
              FROM artists a JOIN music_video_artist_link mval ON a.artist_id = mval.artist_id
              WHERE mval.mv_id = mv.mv_id ORDER BY mval.artist_order, a.artist_name) AS artists_concatenated,

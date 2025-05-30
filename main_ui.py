@@ -401,11 +401,21 @@ class KpopDBBrowser(tk.Tk):
             mv_dict = {
                 "performance_id": f"mv_{row[0]}",  # Unique ID for MVs
                 "db_title": row[1] or "", "performance_date": row[2] or "N/A",
+                # Use file_path1 and file_path2 from the music_videos table
+                "file_path1": row[4] if len(row) > 4 else None,  # file_path1
+                "file_path2": row[5] if len(row) > 5 else None,  # file_path2
+                "file_url": row[3],
+                "score": row[6] if len(row) > 6 else None,
                 "show_type": "", "resolution": "",
-                "file_path1": None, "file_path2": None, "file_url": row[3], "score": row[4],
-                "artists_str": row[5] or "N/A", "songs_str": row[6] or "N/A",
+                "artists_str": row[7] if len(row) > 7 else (row[5] if len(row) > 5 else "N/A"),
+                "songs_str": row[8] if len(row) > 8 else (row[6] if len(row) > 6 else "N/A"),
                 "entry_type": "mv"
             }
+            # Fallback for legacy tuple length (if needed)
+            if mv_dict["file_path1"] is None and len(row) > 4 and isinstance(row[4], str):
+                mv_dict["file_path1"] = row[4]
+            if mv_dict["file_path2"] is None and len(row) > 5 and isinstance(row[5], str):
+                mv_dict["file_path2"] = row[5]
             path, is_yt = utils.get_playable_path_info(mv_dict)
             mv_dict["playable_path"] = path; mv_dict["is_youtube"] = is_yt
             self.all_performances_data.append(mv_dict)
@@ -575,6 +585,8 @@ class KpopDBBrowser(tk.Tk):
         app_instance, is_random_source
     ):
         if not app_instance.winfo_exists(): return
+        # Filter out non-string paths to avoid TypeError
+        local_file_paths_list = [p for p in local_file_paths_list if isinstance(p, str)]
         if not local_file_paths_list and not youtube_url_list:
             app_instance.after(0, app_instance.enable_play_buttons)
             app_instance.after(0, lambda: app_instance.status_var.set("Ready. Nothing to play."))
@@ -715,12 +727,12 @@ class KpopDBBrowser(tk.Tk):
         for perf_data in self.all_performances_data:
             playable_path = perf_data.get("playable_path")
             is_url = perf_data.get("file_url") and playable_path == perf_data.get("file_url")
-            if playable_path and not is_url: 
-                 local_paths_for_wake.append(playable_path)
-        
+            # Only add if playable_path is a string (not int/None)
+            if playable_path and not is_url and isinstance(playable_path, str):
+                local_paths_for_wake.append(playable_path)
         if not local_paths_for_wake: return
 
-        unique_dirs = sorted(list(set(os.path.dirname(p) for p in local_paths_for_wake if p and os.path.dirname(p))))
+        unique_dirs = sorted(list(set(os.path.dirname(p) for p in local_paths_for_wake if isinstance(p, str) and os.path.dirname(p))))
         if not unique_dirs: return
 
         dirs_to_ping = []
