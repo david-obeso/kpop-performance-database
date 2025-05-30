@@ -147,6 +147,33 @@ class DataEntryWindow(tk.Toplevel):
         self.url_entry_var.set("")
         self.proceed_button.config(state=tk.NORMAL)  # <-- Always enable here
 
+    def _all_mv_url_fields_filled(self):
+        # Checks if all required fields for MV URL entry have data
+        url = self.url_entry_var.get().strip()
+        artist = self.primary_artist_var.get().strip()
+        title = self.title_var.get().strip()
+        date = self.date_var.get().strip()
+        return bool(url and artist and title and date)
+
+    def _show_mv_url_confirmation_popup(self):
+        popup = tk.Toplevel(self)
+        popup.title("Confirm Music Video Data")
+        popup.geometry("800x300")
+        popup.transient(self)
+        popup.grab_set()
+        frame = ttk.Frame(popup, padding=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+        # Show the entered data
+        ttk.Label(frame, text="Please review the entered data:", font=FONT_HEADER).pack(pady=(0,10))
+        ttk.Label(frame, text=f"URL: {self.url_entry_var.get()}").pack(anchor="w")
+        ttk.Label(frame, text=f"Primary Artist: {self.primary_artist_var.get()}").pack(anchor="w")
+        ttk.Label(frame, text=f"Title: {self.title_var.get()}").pack(anchor="w")
+        ttk.Label(frame, text=f"Date: {self.date_var.get()}").pack(anchor="w")
+        # Buttons
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(pady=20)
+        ttk.Button(btn_frame, text="OK", command=popup.destroy).pack(side=tk.LEFT, padx=5)
+
     def handle_proceed(self):
         entry_type = self.entry_type_var.get()
         source_type = self.source_type_var.get()
@@ -156,6 +183,11 @@ class DataEntryWindow(tk.Toplevel):
 
         print(f"Proceeding with: Entry={entry_type}, Source={source_type}") # Keep for console feedback
 
+        if entry_type == "music_video" and source_type == "url":
+            self.build_url_entry_ui(item_name="Music Video")
+            if self._all_mv_url_fields_filled():
+                self._show_mv_url_confirmation_popup()
+            return
         if entry_type in ("performance", "music_video") and source_type == "url":
             self.build_url_entry_ui(item_name="Performance" if entry_type == "performance" else "Music Video")
             if self.all_fields_filled():
