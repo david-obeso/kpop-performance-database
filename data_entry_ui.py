@@ -80,10 +80,8 @@ class DataEntryWindow(tk.Toplevel):
         self.source_type_var = tk.StringVar(value="url")
         self.title_var = tk.StringVar()
 
-        # Added date variable
+        # Remove default date assignment so the date field starts empty
         self.date_var = tk.StringVar()
-        today = datetime.date.today()
-        self.date_var.set(today.strftime("%Y-%m-%d"))
 
         selection_outer_frame = ttk.Frame(main_frame, style="DataEntry.TFrame")
         selection_outer_frame.pack(pady=0, fill="x")
