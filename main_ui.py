@@ -379,26 +379,36 @@ class KpopDBBrowser(tk.Tk):
             self.artist_var.set(artist_names[0])
 
     def load_performances(self):
-        self.status_var.set("Loading performances from database..."); self.update_idletasks()
-        raw_rows = db_operations.get_all_performances_raw()
-        
+        self.status_var.set("Loading performances and music videos from database..."); self.update_idletasks()
+        perf_rows = db_operations.get_all_performances_raw()
+        mv_rows = db_operations.get_all_music_videos_raw()
+
         self.all_performances_data = []
-        for row in raw_rows: 
+        # Process performances
+        for row in perf_rows:
             perf_dict = {
                 "performance_id": row[0], "db_title": row[1] or "", "performance_date": row[2] or "N/A",
-                "show_type": row[3] or "N/A", "resolution": row[4] or "N/A",
+                "show_type": row[3] or "", "resolution": row[4] or "",
                 "file_path1": row[5], "file_path2": row[6], "file_url": row[7], "score": row[8],
-                "artists_str": row[9] or "N/A", "songs_str": row[10] or "N/A" 
+                "artists_str": row[9] or "N/A", "songs_str": row[10] or "N/A",
+                "entry_type": "performance"
             }
-            path, is_yt = utils.get_playable_path_info(perf_dict) 
+            path, is_yt = utils.get_playable_path_info(perf_dict)
             perf_dict["playable_path"] = path; perf_dict["is_youtube"] = is_yt
-            # Add a type field for filtering: 'mv' or 'performance'
-            if perf_dict.get("show_type", "").lower() == "music video" or perf_dict.get("db_title", "").lower().startswith("mv:"):
-                perf_dict["entry_type"] = "mv"
-            else:
-                perf_dict["entry_type"] = "performance"
             self.all_performances_data.append(perf_dict)
-            
+        # Process music videos
+        for row in mv_rows:
+            mv_dict = {
+                "performance_id": f"mv_{row[0]}",  # Unique ID for MVs
+                "db_title": row[1] or "", "performance_date": row[2] or "N/A",
+                "show_type": "", "resolution": "",
+                "file_path1": None, "file_path2": None, "file_url": row[3], "score": row[4],
+                "artists_str": row[5] or "N/A", "songs_str": row[6] or "N/A",
+                "entry_type": "mv"
+            }
+            path, is_yt = utils.get_playable_path_info(mv_dict)
+            mv_dict["playable_path"] = path; mv_dict["is_youtube"] = is_yt
+            self.all_performances_data.append(mv_dict)
         self.update_list()
         self.pre_wake_external_drives()
 
@@ -410,29 +420,29 @@ class KpopDBBrowser(tk.Tk):
         show_mv = self.show_mv_var.get()
         show_perf = self.show_perf_var.get()
         show_url_only = self.show_url_only_var.get()
-
         self.filtered_performances_data = []
         self.listbox.delete(0, tk.END)
-
         for perf_data in self.all_performances_data:
-            # --- New filtering logic ---
             entry_type = perf_data.get("entry_type", "performance")
             if not ((show_mv and entry_type == "mv") or (show_perf and entry_type == "performance")):
                 continue
             if show_url_only and not perf_data.get("file_url"):
                 continue
-            
             if artist_filter and artist_filter not in perf_data.get("artists_str", "").lower(): continue
             if date_filter and not perf_data.get("performance_date", "").startswith(date_filter): continue
             if filter_4k:
                 res_lower = perf_data.get("resolution", "").lower()
                 if not any(keyword in res_lower for keyword in self.RESOLUTION_HIGH_QUALITY_KEYWORDS): continue
-            
             disp_date = perf_data.get("performance_date", "N/A")[:12]
             disp_artists = perf_data.get("artists_str", "N/A")
             disp_perf_title = perf_data.get("db_title", "N/A") 
-            disp_show_type = perf_data.get("show_type", "N/A")
-            disp_res = perf_data.get("resolution", "N/A")[:8]
+            # For MVs, leave show_type and resolution blank
+            if entry_type == "mv":
+                disp_show_type = ""
+                disp_res = ""
+            else:
+                disp_show_type = perf_data.get("show_type", "N/A")
+                disp_res = perf_data.get("resolution", "N/A")[:8]
             disp_score = str(perf_data.get("score")) if perf_data.get("score") is not None else ""
             
             source_text = "N/A"
@@ -637,7 +647,7 @@ class KpopDBBrowser(tk.Tk):
                     app_instance.after(600, lambda: app_instance.show_played_info_window(all_processed_perf_details_dicts))
             else: 
                 app_instance.after(500, lambda: app_instance.status_var.set("Ready. No valid items were processed for further actions."))
-        
+
     def show_played_info_window(self, played_details_dicts):
         if not played_details_dicts: return
         info_win = tk.Toplevel(self); info_win.title("Played Performance Details"); info_win.geometry("800x500") 

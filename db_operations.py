@@ -131,3 +131,34 @@ def insert_music_video(title, release_date, file_url, score, artist_names, song_
                 [(song_id, mv_id) for song_id in song_ids]
             )
     conn.commit()
+
+def get_all_music_videos_raw():
+    """
+    Fetches raw music video data along with concatenated artists and songs.
+    Returns a list of tuples directly from the database query.
+    """
+    conn = get_db_connection()
+    if not conn:
+        return []
+    query = """
+        SELECT
+            mv.mv_id, mv.title, mv.release_date, mv.file_url, mv.score,
+            (SELECT GROUP_CONCAT(a.artist_name, ', ')
+             FROM artists a JOIN music_video_artist_link mval ON a.artist_id = mval.artist_id
+             WHERE mval.mv_id = mv.mv_id ORDER BY mval.artist_order, a.artist_name) AS artists_concatenated,
+            (SELECT GROUP_CONCAT(s.song_title, ', ')
+             FROM songs s JOIN song_music_video_link smvl ON s.song_id = smvl.song_id
+             WHERE smvl.music_video_id = mv.mv_id) AS songs_concatenated
+        FROM music_videos mv
+        ORDER BY mv.release_date DESC, mv.mv_id DESC;
+    """
+    music_videos_raw = []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        music_videos_raw = cursor.fetchall()
+    except sqlite3.Error as e:
+        print(f"Database error in get_all_music_videos_raw: {e}")
+    except AttributeError as e:
+        print(f"AttributeError in get_all_music_videos_raw (likely conn is None): {e}")
+    return music_videos_raw
