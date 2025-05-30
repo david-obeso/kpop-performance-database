@@ -216,7 +216,7 @@ class DataEntryWindow(tk.Toplevel):
         go_button = ttk.Button(url_frame, text="GO", command=self.open_url_in_browser, style="DataEntry.TButton")
         go_button.pack(anchor="e", pady=2)
 
-        artist_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")  # <-- FIXED HERE
+        artist_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
         artist_frame.pack(fill="x", pady=6)
 
         ttk.Label(artist_frame, text="Primary Artist:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
@@ -309,8 +309,6 @@ class DataEntryWindow(tk.Toplevel):
             date_entry = ttk.Entry(date_frame, textvariable=self.date_var, width=12, style="DataEntry.TEntry")
             date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
         ttk.Label(date_frame, text="(YYYY-MM-DD)", style="DataEntry.TLabel").grid(row=0, column=2, sticky="w", padx=(8,2))
-
-        ttk.Label(step_frame, text="Next: Song Selection...", style="DataEntry.TLabel").pack(anchor="w", pady=(15,0))
 
     def update_artists_from_spotify(self):
         # Paths to your scripts
