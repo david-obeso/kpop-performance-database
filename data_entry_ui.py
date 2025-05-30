@@ -158,7 +158,7 @@ class DataEntryWindow(tk.Toplevel):
     def _show_mv_url_confirmation_popup(self):
         popup = tk.Toplevel(self)
         popup.title("Confirm Music Video Data")
-        popup.geometry("900x450")  # Keep the window wide for long URLs
+        popup.geometry("900x450")
         popup.transient(self)
         popup.grab_set()
         frame = ttk.Frame(popup, padding=20)
@@ -167,13 +167,16 @@ class DataEntryWindow(tk.Toplevel):
         ttk.Label(frame, text=f"URL: {self.url_entry_var.get()}").pack(anchor="w")
         ttk.Label(frame, text=f"Primary Artist: {self.primary_artist_var.get()}").pack(anchor="w")
         ttk.Label(frame, text=f"Title: {self.title_var.get()}").pack(anchor="w")
-        ttk.Label(frame, text=f"Date: {self.date_var.get()}").pack(anchor="w")
+        # Convert date for display
+        raw_date = self.date_var.get().strip()
+        formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
+        ttk.Label(frame, text=f"Date: {formatted_date if formatted_date else raw_date}").pack(anchor="w")
         # Song warning if no songs selected
         if not self.selected_song_titles:
             ttk.Label(frame, text="Warning: No song selected!", foreground="orange", font=(FONT_MAIN[0], FONT_MAIN[1], "bold")).pack(anchor="w", pady=(5,0))
         # Date warning if date is still default (today)
         today_str = datetime.date.today().strftime("%Y-%m-%d")
-        if self.date_var.get() == today_str:
+        if formatted_date == today_str:
             ttk.Label(frame, text="Warning: Date is still set to today's date", foreground="orange", font=(FONT_MAIN[0], FONT_MAIN[1], "bold")).pack(anchor="w", pady=(2,0))
         # Music Video? checkbox
         mv_check_frame = ttk.Frame(frame)
@@ -233,16 +236,17 @@ class DataEntryWindow(tk.Toplevel):
     def handle_proceed(self):
         entry_type = self.entry_type_var.get()
         source_type = self.source_type_var.get()
-        
         for widget in self.content_area_frame.winfo_children():
             widget.destroy()
-
-        print(f"Proceeding with: Entry={entry_type}, Source={source_type}") # Keep for console feedback
-
+        print(f"Proceeding with: Entry={entry_type}, Source={source_type}")
         if entry_type == "music_video" and source_type == "url":
             self.build_url_entry_ui(item_name="Music Video")
+            # Only show confirmation popup if all required fields are filled
             if self._all_mv_url_fields_filled():
                 self._show_mv_url_confirmation_popup()
+            else:
+                # Optionally, show a warning if user tries to proceed without all fields
+                messagebox.showwarning("Missing Data", "Please fill in all required fields before proceeding.", parent=self)
             return
         if entry_type in ("performance", "music_video") and source_type == "url":
             self.build_url_entry_ui(item_name="Performance" if entry_type == "performance" else "Music Video")
@@ -389,14 +393,13 @@ class DataEntryWindow(tk.Toplevel):
         date_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
         date_frame.pack(fill="x", pady=(10,0))
 
-        ttk.Label(date_frame, text="Date:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
-        if HAS_TKCALENDAR:
-            date_entry = DateEntry(date_frame, textvariable=self.date_var, date_pattern="yyyy-mm-dd", width=12, font=FONT_ENTRY_DATA_UI)
-            date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
-        else:
-            date_entry = ttk.Entry(date_frame, textvariable=self.date_var, width=12, style="DataEntry.TEntry")
-            date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
-        ttk.Label(date_frame, text="(YYYY-MM-DD)", style="DataEntry.TLabel").grid(row=0, column=2, sticky="w", padx=(8,2))
+        ttk.Label(date_frame, text="Date (YYMMDD):", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
+        # Only clear the date if the user is starting a new entry, not on every UI rebuild
+        if not self.date_var.get():
+            self.date_var.set("")
+        self.date_entry = ttk.Entry(date_frame, textvariable=self.date_var, width=12, style="DataEntry.TEntry")
+        self.date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
+        ttk.Label(date_frame, text="(e.g. 240530)", style="DataEntry.TLabel").grid(row=0, column=2, sticky="w", padx=(8,2))
 
     def update_artists_from_spotify(self):
         # Paths to your scripts
@@ -698,7 +701,8 @@ class DataEntryWindow(tk.Toplevel):
         secondary_artist = self.secondary_artist_var.get().strip() or None
         songs = self.selected_song_titles
         title = self.title_var.get()
-        date = self.date_var.get()
+        raw_date = self.date_var.get().strip()
+        date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
         score = 0 if entry_type == "music_video" else None
 
         summary = f"Type: {entry_type.replace('_', ' ').title()}\n"
@@ -732,3 +736,16 @@ class DataEntryWindow(tk.Toplevel):
                 self.close_window()
             except Exception as e:
                 messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)
+
+    def _convert_yymmdd_to_yyyy_mm_dd(self, yymmdd):
+        # Converts yymmdd string to yyyy-mm-dd, returns None if invalid
+        if len(yymmdd) != 6 or not yymmdd.isdigit():
+            return None
+        year = int(yymmdd[:2])
+        month = yymmdd[2:4]
+        day = yymmdd[4:6]
+        year += 2000 if year < 50 else 1900  # 00-49: 2000s, 50-99: 1900s
+        try:
+            return f"{year:04d}-{month}-{day}"
+        except Exception:
+            return None
