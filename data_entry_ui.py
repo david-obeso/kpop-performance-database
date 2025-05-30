@@ -172,7 +172,10 @@ class DataEntryWindow(tk.Toplevel):
         # Buttons
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(pady=20)
-        ttk.Button(btn_frame, text="OK", command=popup.destroy).pack(side=tk.LEFT, padx=5)
+        confirm_btn = ttk.Button(btn_frame, text="Confirm", state="disabled")
+        confirm_btn.pack(side=tk.LEFT, padx=5)
+        cancel_btn = ttk.Button(btn_frame, text="Cancel", command=popup.destroy)
+        cancel_btn.pack(side=tk.LEFT, padx=5)
 
     def handle_proceed(self):
         entry_type = self.entry_type_var.get()
