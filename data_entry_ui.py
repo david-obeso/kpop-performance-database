@@ -607,6 +607,12 @@ class DataEntryWindow(tk.Toplevel):
             messagebox.showinfo("No Songs", "No songs found for the selected artist(s).", parent=self)
             return
 
+        # Build a mapping from title to all song_ids with that title
+        title_to_song_ids = {}
+        for song_id, title in songs:
+            title_to_song_ids.setdefault(title, []).append(song_id)
+        unique_titles = sorted(title_to_song_ids.keys(), key=lambda t: t.lower())
+
         popup = tk.Toplevel(self)
         popup.title("Select Song(s)")
         popup.configure(bg=DARK_BG)
@@ -627,19 +633,24 @@ class DataEntryWindow(tk.Toplevel):
         scrollbar.pack(side="right", fill="y")
         listbox.pack(side="left", fill="both", expand=True)
 
-        song_id_title = [(str(song_id), title) for song_id, title in songs]
-        for song_id, title in song_id_title:
+        for title in unique_titles:
             listbox.insert(tk.END, title)
 
-        # Pre-select already selected songs
-        for idx, (song_id, title) in enumerate(song_id_title):
-            if int(song_id) in self.selected_song_ids:
+        # Pre-select already selected songs (if any of their song_ids are in self.selected_song_ids)
+        for idx, title in enumerate(unique_titles):
+            song_ids = title_to_song_ids[title]
+            if any(song_id in self.selected_song_ids for song_id in song_ids):
                 listbox.selection_set(idx)
 
         def on_ok():
             selected_indices = listbox.curselection()
-            self.selected_song_ids = [int(song_id_title[i][0]) for i in selected_indices]
-            self.selected_song_titles = [song_id_title[i][1] for i in selected_indices]
+            selected_titles = [unique_titles[i] for i in selected_indices]
+            # For each selected title, collect all song_ids for that title
+            selected_song_ids = []
+            for title in selected_titles:
+                selected_song_ids.extend(title_to_song_ids[title])
+            self.selected_song_ids = selected_song_ids
+            self.selected_song_titles = selected_titles
             popup.destroy()
             self.build_url_entry_ui(item_name="Performance" if self.entry_type_var.get() == "performance" else "Music Video")
             self.update_title_from_songs()  # Update title after song selection
