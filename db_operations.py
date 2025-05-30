@@ -88,28 +88,46 @@ def get_all_performances_raw():
         print(f"AttributeError in get_all_performances_raw (likely conn is None): {e}")
     return performances_raw
 
-def insert_music_video(title, release_date, file_url, score, artist_names, song_ids):
+def insert_music_video(title, release_date, file_url, score, artist_names, song_titles):
     conn = get_db_connection()
     cursor = conn.cursor()
+    # 1. Insert music video
     cursor.execute(
         "INSERT INTO music_videos (title, release_date, file_url, score) VALUES (?, ?, ?, ?)",
         (title, release_date, file_url, score)
     )
     mv_id = cursor.lastrowid
-    # Link artists
+    # 2. Link artists
+    artist_ids = []
     for idx, artist_name in enumerate(artist_names):
         cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
         row = cursor.fetchone()
         if row:
             artist_id = row[0]
+            artist_ids.append(artist_id)
             cursor.execute(
                 "INSERT INTO music_video_artist_link (mv_id, artist_id, artist_order) VALUES (?, ?, ?)",
                 (mv_id, artist_id, idx+1)
             )
-    # Link songs
-    for song_id in song_ids:
-        cursor.execute(
-            "INSERT INTO song_music_video_link (song_id, music_video_id) VALUES (?, ?)",
-            (song_id, mv_id)
-        )
+    # 3. Link songs: fetch all relevant song_ids in one query, then batch insert
+    if song_titles and artist_ids:
+        # Build a set of (song_title, artist_id) pairs
+        pairs = [(song_title, artist_id) for song_title in song_titles for artist_id in artist_ids]
+        # Use a single query with IN clauses
+        song_titles_set = tuple(set(song_titles))
+        artist_ids_set = tuple(set(artist_ids))
+        if song_titles_set and artist_ids_set:
+            query = (
+                "SELECT s.song_id FROM songs s "
+                "JOIN song_artist_link sal ON s.song_id = sal.song_id "
+                f"WHERE s.song_title IN ({','.join(['?']*len(song_titles_set))}) "
+                f"AND sal.artist_id IN ({','.join(['?']*len(artist_ids_set))})"
+            )
+            cursor.execute(query, song_titles_set + artist_ids_set)
+            song_ids = [row[0] for row in cursor.fetchall()]
+            # Batch insert all links
+            cursor.executemany(
+                "INSERT OR IGNORE INTO song_music_video_link (song_id, music_video_id) VALUES (?, ?)",
+                [(song_id, mv_id) for song_id in song_ids]
+            )
     conn.commit()

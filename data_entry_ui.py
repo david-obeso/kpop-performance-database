@@ -181,16 +181,16 @@ class DataEntryWindow(tk.Toplevel):
         mv_check_frame.pack(anchor="w", pady=(15,0))
         ttk.Label(mv_check_frame, text="Music Video?").pack(side=tk.LEFT)
         is_mv_var = tk.BooleanVar(value=False)
+        mv_checkbox = ttk.Checkbutton(mv_check_frame, variable=is_mv_var)
+        mv_checkbox.pack(side=tk.LEFT, padx=8)
         # Validation label
         validation_label = ttk.Label(frame, text="", foreground="red")
         validation_label.pack(anchor="w", pady=(5,0))
         def validate_confirm_state(*_):
-            # 1. Music Video? must be checked
             if not is_mv_var.get():
                 confirm_btn.config(state="disabled")
                 validation_label.config(text="Please confirm this is a Music Video.")
                 return
-            # 2. URL must not already exist in file_path1
             url = self.url_entry_var.get().strip()
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
@@ -199,33 +199,50 @@ class DataEntryWindow(tk.Toplevel):
                 confirm_btn.config(state="disabled")
                 validation_label.config(text="A music video with this URL already exists in file_path1.")
                 return
-            # 3. No entry with same artist and title
             title = self.title_var.get().strip()
             artist_name = self.primary_artist_var.get().strip()
             cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
             row = cursor.fetchone()
             if not row:
                 confirm_btn.config(state="disabled")
-                validation_label.config(text="Artist not found in database.")
+                validation_label.config(text="Primary artist not found in database.")
                 return
-            artist_id = row[0]
-            cursor.execute("SELECT mv_id FROM music_videos WHERE title = ?", (title,))
-            mv_ids = [r[0] for r in cursor.fetchall()]
-            if mv_ids:
-                for mv_id in mv_ids:
-                    cursor.execute("SELECT 1 FROM music_video_artist_link WHERE mv_id = ? AND artist_id = ?", (mv_id, artist_id))
-                    if cursor.fetchone():
-                        confirm_btn.config(state="disabled")
-                        validation_label.config(text="A music video with this artist and title already exists.")
-                        return
+            if not self.title_var.get().strip() or not self.date_var.get().strip():
+                confirm_btn.config(state="disabled")
+                validation_label.config(text="Title and date are required.")
+                return
             confirm_btn.config(state="normal")
             validation_label.config(text="")
-        mv_checkbox = ttk.Checkbutton(mv_check_frame, variable=is_mv_var, command=validate_confirm_state)
-        mv_checkbox.pack(side=tk.LEFT, padx=8)
+        mv_checkbox.config(command=validate_confirm_state)
         # Buttons
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(pady=20)
-        confirm_btn = ttk.Button(btn_frame, text="Confirm", state="disabled")
+        def on_confirm():
+            # Save the music video and links
+            title = self.title_var.get().strip()
+            date = self._convert_yymmdd_to_yyyy_mm_dd(self.date_var.get().strip())
+            url = self.url_entry_var.get().strip()
+            score = 0
+            # Collect all artist names (primary + secondary if present)
+            artist_names = [self.primary_artist_var.get().strip()]
+            if self.secondary_artist_var.get().strip():
+                artist_names.append(self.secondary_artist_var.get().strip())
+            song_titles = self.selected_song_titles
+            try:
+                self.db_ops.insert_music_video(
+                    title=title,
+                    release_date=date,
+                    file_url=url,
+                    score=score,
+                    artist_names=artist_names,
+                    song_titles=song_titles
+                )
+                messagebox.showinfo("Success", "Entry saved to database.", parent=self)
+                popup.destroy()
+                self.close_window()
+            except Exception as e:
+                messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)
+        confirm_btn = ttk.Button(btn_frame, text="Confirm", state="disabled", command=on_confirm)
         confirm_btn.pack(side=tk.LEFT, padx=5)
         cancel_btn = ttk.Button(btn_frame, text="Cancel", command=popup.destroy)
         cancel_btn.pack(side=tk.LEFT, padx=5)

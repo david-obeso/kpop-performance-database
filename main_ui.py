@@ -230,6 +230,11 @@ class KpopDBBrowser(tk.Tk):
         self.score_editor_window = None
         self.data_entry_window_instance = None # For the new data entry window
 
+        # --- New variables for filtering ---
+        self.show_mv_var = tk.BooleanVar(value=True)
+        self.show_perf_var = tk.BooleanVar(value=True)
+        self.show_url_only_var = tk.BooleanVar(value=False)
+
         self.create_widgets()
         self.load_artists() 
         self.load_performances()
@@ -259,6 +264,14 @@ class KpopDBBrowser(tk.Tk):
         style.map("Horizontal.TScrollbar", background=[("active", "#6272a4")])
 
         filter_frame = ttk.Frame(self); filter_frame.pack(fill="x", padx=10, pady=8)
+        # --- New checkboxes for MV/Performance and URL ---
+        self.mv_checkbox = ttk.Checkbutton(filter_frame, text="MV", variable=self.show_mv_var, command=self.update_list)
+        self.mv_checkbox.pack(side="left", padx=(0, 8))
+        self.perf_checkbox = ttk.Checkbutton(filter_frame, text="Performance", variable=self.show_perf_var, command=self.update_list)
+        self.perf_checkbox.pack(side="left", padx=(0, 8))
+        self.url_checkbox = ttk.Checkbutton(filter_frame, text="URL", variable=self.show_url_only_var, command=self.update_list)
+        self.url_checkbox.pack(side="left", padx=(0, 15))
+
         ttk.Label(filter_frame, text="Artist:").pack(side="left")
         self.artist_var = tk.StringVar()
         self.artist_dropdown = ttk.Combobox(filter_frame, textvariable=self.artist_var, state="readonly", style="Custom.TCombobox", width=25)
@@ -355,6 +368,7 @@ class KpopDBBrowser(tk.Tk):
 
     def clear_search(self):
         self.search_var.set(""); self.artist_var.set(""); self.date_var.set(""); self.filter_4k_var.set(False)
+        self.show_mv_var.set(True); self.show_perf_var.set(True); self.show_url_only_var.set(False)
         self.update_list()
 
     def load_artists(self):
@@ -378,6 +392,11 @@ class KpopDBBrowser(tk.Tk):
             }
             path, is_yt = utils.get_playable_path_info(perf_dict) 
             perf_dict["playable_path"] = path; perf_dict["is_youtube"] = is_yt
+            # Add a type field for filtering: 'mv' or 'performance'
+            if perf_dict.get("show_type", "").lower() == "music video" or perf_dict.get("db_title", "").lower().startswith("mv:"):
+                perf_dict["entry_type"] = "mv"
+            else:
+                perf_dict["entry_type"] = "performance"
             self.all_performances_data.append(perf_dict)
             
         self.update_list()
@@ -388,11 +407,21 @@ class KpopDBBrowser(tk.Tk):
         date_filter = self.date_var.get()
         search_term = self.search_var.get().lower()
         filter_4k = self.filter_4k_var.get()
+        show_mv = self.show_mv_var.get()
+        show_perf = self.show_perf_var.get()
+        show_url_only = self.show_url_only_var.get()
 
         self.filtered_performances_data = []
         self.listbox.delete(0, tk.END)
 
         for perf_data in self.all_performances_data:
+            # --- New filtering logic ---
+            entry_type = perf_data.get("entry_type", "performance")
+            if not ((show_mv and entry_type == "mv") or (show_perf and entry_type == "performance")):
+                continue
+            if show_url_only and not perf_data.get("file_url"):
+                continue
+            
             if artist_filter and artist_filter not in perf_data.get("artists_str", "").lower(): continue
             if date_filter and not perf_data.get("performance_date", "").startswith(date_filter): continue
             if filter_4k:
