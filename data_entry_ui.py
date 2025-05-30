@@ -31,7 +31,7 @@ class DataEntryWindow(tk.Toplevel):
     def __init__(self, master, db_ops): 
         super().__init__(master)
         self.title("Add or Modify Database Entry")
-        self.geometry("900x900")  # Or adjust as needed
+        self.geometry("900x1000")  # Or adjust as needed
         self.configure(bg=DARK_BG)
         self.transient(master)
         self.grab_set()
@@ -168,6 +168,13 @@ class DataEntryWindow(tk.Toplevel):
         ttk.Label(frame, text=f"Primary Artist: {self.primary_artist_var.get()}").pack(anchor="w")
         ttk.Label(frame, text=f"Title: {self.title_var.get()}").pack(anchor="w")
         ttk.Label(frame, text=f"Date: {self.date_var.get()}").pack(anchor="w")
+        # Song warning if no songs selected
+        if not self.selected_song_titles:
+            ttk.Label(frame, text="Warning: No song selected!", foreground="orange", font=(FONT_MAIN[0], FONT_MAIN[1], "bold")).pack(anchor="w", pady=(5,0))
+        # Date warning if date is still default (today)
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        if self.date_var.get() == today_str:
+            ttk.Label(frame, text="Warning: Date is still set to today's date", foreground="orange", font=(FONT_MAIN[0], FONT_MAIN[1], "bold")).pack(anchor="w", pady=(2,0))
         # Music Video? checkbox
         mv_check_frame = ttk.Frame(frame)
         mv_check_frame.pack(anchor="w", pady=(15,0))
@@ -194,7 +201,6 @@ class DataEntryWindow(tk.Toplevel):
             # 3. No entry with same artist and title
             title = self.title_var.get().strip()
             artist_name = self.primary_artist_var.get().strip()
-            # Get artist_id
             cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
             row = cursor.fetchone()
             if not row:
@@ -202,18 +208,15 @@ class DataEntryWindow(tk.Toplevel):
                 validation_label.config(text="Artist not found in database.")
                 return
             artist_id = row[0]
-            # Find all music_videos with this title
             cursor.execute("SELECT mv_id FROM music_videos WHERE title = ?", (title,))
             mv_ids = [r[0] for r in cursor.fetchall()]
             if mv_ids:
-                # For each mv_id, check if artist_id is linked
                 for mv_id in mv_ids:
                     cursor.execute("SELECT 1 FROM music_video_artist_link WHERE mv_id = ? AND artist_id = ?", (mv_id, artist_id))
                     if cursor.fetchone():
                         confirm_btn.config(state="disabled")
                         validation_label.config(text="A music video with this artist and title already exists.")
                         return
-            # All checks passed
             confirm_btn.config(state="normal")
             validation_label.config(text="")
         mv_checkbox = ttk.Checkbutton(mv_check_frame, variable=is_mv_var, command=validate_confirm_state)
@@ -225,7 +228,6 @@ class DataEntryWindow(tk.Toplevel):
         confirm_btn.pack(side=tk.LEFT, padx=5)
         cancel_btn = ttk.Button(btn_frame, text="Cancel", command=popup.destroy)
         cancel_btn.pack(side=tk.LEFT, padx=5)
-        # Also validate on popup open
         validate_confirm_state()
 
     def handle_proceed(self):
