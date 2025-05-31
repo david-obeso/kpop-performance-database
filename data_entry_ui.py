@@ -128,10 +128,28 @@ class DataEntryWindow(tk.Toplevel):
 
         self.url_entry_var.trace_add("write", self.on_url_change)
 
+        # New variables for show type and resolution choices
+        self.show_type_choices = []
+        self.resolution_choices = []
+        self._load_showtype_and_resolution_choices()
+
     def load_initial_data(self):
         self.all_artists_list = self.db_ops.get_all_artists()
         # Sort the list of dicts by 'name', case-insensitive
         self.all_artists_list = sorted(self.all_artists_list, key=lambda a: a['name'].lower())
+
+    def _load_showtype_and_resolution_choices(self):
+        # Query the DB for all unique show_type and resolution values
+        try:
+            conn = self.db_ops.get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT DISTINCT show_type FROM performances WHERE show_type IS NOT NULL AND TRIM(show_type) != '' ORDER BY show_type;")
+            self.show_type_choices = [row[0] for row in cur.fetchall() if row[0]]
+            cur.execute("SELECT DISTINCT resolution FROM performances WHERE resolution IS NOT NULL AND TRIM(resolution) != '' ORDER BY resolution;")
+            self.resolution_choices = [row[0] for row in cur.fetchall() if row[0]]
+        except Exception as e:
+            self.show_type_choices = []
+            self.resolution_choices = []
 
     def reset_content_on_selection_change(self):
         for widget in self.content_area_frame.winfo_children():
@@ -153,6 +171,15 @@ class DataEntryWindow(tk.Toplevel):
         date = self.date_var.get().strip()
         return bool(url and artist and title and date)
 
+    def _all_performance_url_fields_filled(self):
+        url = self.url_entry_var.get().strip()
+        artist = self.primary_artist_var.get().strip()
+        title = self.title_var.get().strip()
+        date = self.date_var.get().strip()
+        show_type = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else ''
+        resolution = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else ''
+        return bool(url and artist and title and date and show_type and resolution)
+
     def _show_mv_url_confirmation_popup(self):
         popup = tk.Toplevel(self)
         popup.title("Confirm Music Video Data")
@@ -164,8 +191,9 @@ class DataEntryWindow(tk.Toplevel):
         ttk.Label(frame, text="Please review the entered data:", font=FONT_HEADER).pack(pady=(0,10))
         ttk.Label(frame, text=f"URL: {self.url_entry_var.get()}").pack(anchor="w")
         ttk.Label(frame, text=f"Primary Artist: {self.primary_artist_var.get()}").pack(anchor="w")
+        if self.secondary_artist_var.get().strip():
+            ttk.Label(frame, text=f"Secondary Artist: {self.secondary_artist_var.get().strip()}").pack(anchor="w")
         ttk.Label(frame, text=f"Title: {self.title_var.get()}").pack(anchor="w")
-        # Convert date for display
         raw_date = self.date_var.get().strip()
         formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
         ttk.Label(frame, text=f"Date: {formatted_date if formatted_date else raw_date}").pack(anchor="w")
@@ -192,24 +220,38 @@ class DataEntryWindow(tk.Toplevel):
                 validation_label.config(text="Please confirm this is a Music Video.")
                 return
             url = self.url_entry_var.get().strip()
+            title = self.title_var.get().strip()
+            artist_name = self.primary_artist_var.get().strip()
+            date = self.date_var.get().strip()
+            if not (url and title and artist_name and date):
+                confirm_btn.config(state="disabled")
+                validation_label.config(text="URL, artist, title, and date are required.")
+                return
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
+            # 1. URL must not already exist in file_path1
             cursor.execute("SELECT 1 FROM music_videos WHERE file_path1 = ?", (url,))
             if cursor.fetchone():
                 confirm_btn.config(state="disabled")
                 validation_label.config(text="A music video with this URL already exists in file_path1.")
                 return
-            title = self.title_var.get().strip()
-            artist_name = self.primary_artist_var.get().strip()
+            # 2. Primary artist must exist
             cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
             row = cursor.fetchone()
             if not row:
                 confirm_btn.config(state="disabled")
                 validation_label.config(text="Primary artist not found in database.")
                 return
-            if not self.title_var.get().strip() or not self.date_var.get().strip():
+            # 3. No previous record with same artist and title
+            cursor.execute("""
+                SELECT 1 FROM music_videos mv
+                JOIN music_video_artist_link mval ON mv.mv_id = mval.mv_id
+                JOIN artists a ON mval.artist_id = a.artist_id
+                WHERE mv.title = ? AND a.artist_name = ?
+            """, (title, artist_name))
+            if cursor.fetchone():
                 confirm_btn.config(state="disabled")
-                validation_label.config(text="Title and date are required.")
+                validation_label.config(text="A music video with this artist and title already exists.")
                 return
             confirm_btn.config(state="normal")
             validation_label.config(text="")
@@ -218,12 +260,10 @@ class DataEntryWindow(tk.Toplevel):
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(pady=20)
         def on_confirm():
-            # Save the music video and links
             title = self.title_var.get().strip()
             date = self._convert_yymmdd_to_yyyy_mm_dd(self.date_var.get().strip())
             url = self.url_entry_var.get().strip()
             score = 0
-            # Collect all artist names (primary + secondary if present)
             artist_names = [self.primary_artist_var.get().strip()]
             if self.secondary_artist_var.get().strip():
                 artist_names.append(self.secondary_artist_var.get().strip())
@@ -248,6 +288,85 @@ class DataEntryWindow(tk.Toplevel):
         cancel_btn.pack(side=tk.LEFT, padx=5)
         validate_confirm_state()
 
+    def _show_performance_url_confirmation_popup(self):
+        popup = tk.Toplevel(self)
+        popup.title("Confirm Performance Data")
+        popup.geometry("900x450")
+        popup.transient(self)
+        popup.grab_set()
+        frame = ttk.Frame(popup, padding=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(frame, text="Please review the entered data:", font=FONT_HEADER).pack(pady=(0,10))
+        ttk.Label(frame, text=f"URL: {self.url_entry_var.get()}").pack(anchor="w")
+        ttk.Label(frame, text=f"Primary Artist: {self.primary_artist_var.get()}").pack(anchor="w")
+        if self.secondary_artist_var.get().strip():
+            ttk.Label(frame, text=f"Secondary Artist: {self.secondary_artist_var.get().strip()}").pack(anchor="w")
+        ttk.Label(frame, text=f"Title: {self.title_var.get()}").pack(anchor="w")
+        raw_date = self.date_var.get().strip()
+        formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
+        ttk.Label(frame, text=f"Date: {formatted_date if formatted_date else raw_date}").pack(anchor="w")
+        ttk.Label(frame, text=f"Show Type: {self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else ''}").pack(anchor="w")
+        ttk.Label(frame, text=f"Resolution: {self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else ''}").pack(anchor="w")
+        if not self.selected_song_titles:
+            ttk.Label(frame, text="Warning: No song selected!", foreground="orange", font=(FONT_MAIN[0], FONT_MAIN[1], "bold")).pack(anchor="w", pady=(5,0))
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        if formatted_date == today_str:
+            ttk.Label(frame, text="Warning: Date is still set to today's date", foreground="orange", font=(FONT_MAIN[0], FONT_MAIN[1], "bold")).pack(anchor="w", pady=(2,0))
+        validation_label = ttk.Label(frame, text="", foreground="red")
+        validation_label.pack(anchor="w", pady=(5,0))
+        def validate_confirm_state(*_):
+            url = self.url_entry_var.get().strip()
+            title = self.title_var.get().strip()
+            artist_name = self.primary_artist_var.get().strip()
+            date = self._convert_yymmdd_to_yyyy_mm_dd(self.date_var.get().strip())
+            show_type = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else ''
+            resolution = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else ''
+            if not (url and title and artist_name and date and show_type and resolution):
+                confirm_btn.config(state="disabled")
+                validation_label.config(text="All fields (URL, artist, title, date, show type, resolution) are required.")
+                return
+            conn = self.db_ops.get_db_connection()
+            cursor = conn.cursor()
+            # 1. URL must not exist in file_path1
+            cursor.execute("SELECT 1 FROM performances WHERE file_path1 = ?", (url,))
+            if cursor.fetchone():
+                confirm_btn.config(state="disabled")
+                validation_label.config(text="A performance with this URL already exists in file_path1.")
+                return
+            # 2. Primary artist must exist
+            cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
+            row = cursor.fetchone()
+            if not row:
+                confirm_btn.config(state="disabled")
+                validation_label.config(text="Primary artist not found in database.")
+                return
+            # 3. No previous record with same artist, title, and date
+            cursor.execute("""
+                SELECT 1 FROM performances p
+                JOIN performance_artist_link pal ON p.performance_id = pal.performance_id
+                JOIN artists a ON pal.artist_id = a.artist_id
+                WHERE p.title = ? AND p.performance_date = ? AND a.artist_name = ?
+            """, (title, date, artist_name))
+            if cursor.fetchone():
+                confirm_btn.config(state="disabled")
+                validation_label.config(text="A performance with this artist, title, and date already exists.")
+                return
+            confirm_btn.config(state="normal")
+            validation_label.config(text="")
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(pady=20)
+        def on_confirm():
+            try:
+                self.confirm_and_save_entry("performance")
+                popup.destroy()
+            except Exception as e:
+                messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)
+        confirm_btn = ttk.Button(btn_frame, text="Confirm", state="disabled", command=on_confirm)
+        confirm_btn.pack(side=tk.LEFT, padx=5)
+        cancel_btn = ttk.Button(btn_frame, text="Cancel", command=popup.destroy)
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+        validate_confirm_state()
+
     def handle_proceed(self):
         entry_type = self.entry_type_var.get()
         source_type = self.source_type_var.get()
@@ -256,15 +375,19 @@ class DataEntryWindow(tk.Toplevel):
         print(f"Proceeding with: Entry={entry_type}, Source={source_type}")
         if entry_type == "music_video" and source_type == "url":
             self.build_url_entry_ui(item_name="Music Video")
-            # Only show confirmation popup if all required fields are filled
             if self._all_mv_url_fields_filled():
                 self._show_mv_url_confirmation_popup()
-            # Do nothing if not all fields are filled (no warning popup)
             return
-        if entry_type in ("performance", "music_video") and source_type == "url":
-            self.build_url_entry_ui(item_name="Performance" if entry_type == "performance" else "Music Video")
-            if self.all_fields_filled():
-                self.confirm_and_save_entry(entry_type)
+        if entry_type == "performance" and source_type == "url":
+            self.build_url_entry_ui(item_name="Performance")
+            if self._all_performance_url_fields_filled():
+                self._show_performance_url_confirmation_popup()
+            return
+        if entry_type == "music_video" and source_type == "url":
+            self.build_url_entry_ui(item_name="Music Video")
+            if self._all_mv_url_fields_filled():
+                self._show_mv_url_confirmation_popup()
+            return
         else:
             ttk.Label(self.content_area_frame,
                       text=f"Placeholder UI for:\nEntry Type: {entry_type.replace('_', ' ').title()}\nSource Type: {source_type.replace('_', ' ').title()}",
@@ -424,6 +547,40 @@ class DataEntryWindow(tk.Toplevel):
         self.date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
         self._add_right_click_paste(self.date_entry)
         ttk.Label(date_frame, text="(e.g. 240530)", style="DataEntry.TLabel").grid(row=0, column=2, sticky="w", padx=(8,2))
+
+        # Show show_type and resolution dropdowns if performance+url
+        if self.entry_type_var.get() == "performance" and self.source_type_var.get() == "url":
+            showtype_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
+            showtype_frame.pack(fill="x", pady=(10,0))
+            ttk.Label(showtype_frame, text="Show Type:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
+            if not hasattr(self, 'show_type_var'):
+                self.show_type_var = tk.StringVar()
+            showtype_combo = ttk.Combobox(showtype_frame, textvariable=self.show_type_var, values=self.show_type_choices + ["<Add new>"] if self.show_type_choices else ["<Add new>"], state="readonly", style="DataEntry.TCombobox", width=30)
+            showtype_combo.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
+            def on_showtype_select(event=None):
+                if self.show_type_var.get() == "<Add new>":
+                    new_val = tk.simpledialog.askstring("Add Show Type", "Enter new show type:", parent=self)
+                    if new_val:
+                        self.show_type_choices.append(new_val)
+                        showtype_combo['values'] = self.show_type_choices + ["<Add new>"]
+                        self.show_type_var.set(new_val)
+            showtype_combo.bind("<<ComboboxSelected>>", on_showtype_select)
+
+            resolution_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
+            resolution_frame.pack(fill="x", pady=(10,0))
+            ttk.Label(resolution_frame, text="Resolution:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
+            if not hasattr(self, 'resolution_var'):
+                self.resolution_var = tk.StringVar()
+            resolution_combo = ttk.Combobox(resolution_frame, textvariable=self.resolution_var, values=self.resolution_choices + ["<Add new>"] if self.resolution_choices else ["<Add new>"], state="readonly", style="DataEntry.TCombobox", width=30)
+            resolution_combo.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
+            def on_resolution_select(event=None):
+                if self.resolution_var.get() == "<Add new>":
+                    new_val = tk.simpledialog.askstring("Add Resolution", "Enter new resolution:", parent=self)
+                    if new_val:
+                        self.resolution_choices.append(new_val)
+                        resolution_combo['values'] = self.resolution_choices + ["<Add new>"]
+                        self.resolution_var.set(new_val)
+            resolution_combo.bind("<<ComboboxSelected>>", on_resolution_select)
 
     def update_artists_from_spotify(self):
         # Paths to your scripts
@@ -728,7 +885,23 @@ class DataEntryWindow(tk.Toplevel):
         raw_date = self.date_var.get().strip()
         date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
         score = 0 if entry_type == "music_video" else None
+        # --- NEW: collect show_type and resolution if performance+url ---
+        show_type_val = None
+        resolution_val = None
+        if entry_type == "performance" and self.source_type_var.get() == "url":
+            show_type_val = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') and self.show_type_var.get().strip() else None
+            resolution_val = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') and self.resolution_var.get().strip() else None
 
+        # --- NEW: Duplicate URL check for performance+url ---
+        if entry_type == "performance" and self.source_type_var.get() == "url":
+            conn = self.db_ops.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM performances WHERE file_url = ?", (url,))
+            if cursor.fetchone():
+                messagebox.showerror("Duplicate URL", "A performance with this URL already exists in the database.", parent=self)
+                return
+
+        # ...existing summary construction...
         summary = f"Type: {entry_type.replace('_', ' ').title()}\n"
         summary += f"URL: {url}\n"
         summary += f"Primary Artist: {primary_artist}\n"
@@ -737,11 +910,13 @@ class DataEntryWindow(tk.Toplevel):
         summary += f"Songs: {', '.join(songs)}\n"
         summary += f"Title: {title}\n"
         summary += f"Date: {date}\n"
+        if entry_type == "performance" and self.source_type_var.get() == "url":
+            summary += f"Show Type: {show_type_val or '(none)'}\n"
+            summary += f"Resolution: {resolution_val or '(none)'}\n"
         if entry_type == "music_video":
             summary += f"Score: 0 (fixed)\n"
         else:
             summary += f"Score: (to be set later)\n"
-
         if messagebox.askokcancel("Confirm Entry", f"Please confirm the following data:\n\n{summary}", parent=self):
             try:
                 if entry_type == "music_video":
@@ -751,11 +926,20 @@ class DataEntryWindow(tk.Toplevel):
                         file_url=url,
                         score=0,
                         artist_names=[primary_artist] + ([secondary_artist] if secondary_artist else []),
-                        song_ids=self.selected_song_ids
+                        song_titles=self.selected_song_titles
                     )
-                else:
-                    # For performance, call a similar db_ops.insert_performance(...)
-                    pass
+                elif entry_type == "performance" and self.source_type_var.get() == "url":
+                    # You must implement insert_performance in db_operations.py to accept show_type and resolution
+                    self.db_ops.insert_performance(
+                        title=title,
+                        performance_date=date,
+                        show_type=show_type_val,
+                        resolution=resolution_val,
+                        file_url=url,
+                        score=None, # Or set as needed
+                        artist_names=[primary_artist] + ([secondary_artist] if secondary_artist else []),
+                        song_titles=self.selected_song_titles
+                    )
                 messagebox.showinfo("Success", "Entry saved to database.", parent=self)
                 self.close_window()
             except Exception as e:

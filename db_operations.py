@@ -162,3 +162,43 @@ def get_all_music_videos_raw():
     except AttributeError as e:
         print(f"AttributeError in get_all_music_videos_raw (likely conn is None): {e}")
     return music_videos_raw
+
+def insert_performance(title, performance_date, show_type, resolution, file_url, score, artist_names, song_titles):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # 1. Insert performance (file_path1 and file_path2 left NULL for URL-only entries)
+    cursor.execute(
+        "INSERT INTO performances (title, performance_date, show_type, resolution, file_url, score) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, performance_date, show_type, resolution, file_url, score)
+    )
+    perf_id = cursor.lastrowid
+    # 2. Link artists
+    artist_ids = []
+    for idx, artist_name in enumerate(artist_names):
+        cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
+        row = cursor.fetchone()
+        if row:
+            artist_id = row[0]
+            artist_ids.append(artist_id)
+            cursor.execute(
+                "INSERT INTO performance_artist_link (performance_id, artist_id, artist_order) VALUES (?, ?, ?)",
+                (perf_id, artist_id, idx+1)
+            )
+    # 3. Link songs: fetch all relevant song_ids in one query, then batch insert
+    if song_titles and artist_ids:
+        song_titles_set = tuple(set(song_titles))
+        artist_ids_set = tuple(set(artist_ids))
+        if song_titles_set and artist_ids_set:
+            query = (
+                "SELECT s.song_id FROM songs s "
+                "JOIN song_artist_link sal ON s.song_id = sal.song_id "
+                f"WHERE s.song_title IN ({','.join(['?']*len(song_titles_set))}) "
+                f"AND sal.artist_id IN ({','.join(['?']*len(artist_ids_set))})"
+            )
+            cursor.execute(query, song_titles_set + artist_ids_set)
+            song_ids = [row[0] for row in cursor.fetchall()]
+            cursor.executemany(
+                "INSERT OR IGNORE INTO song_performance_link (song_id, performance_id) VALUES (?, ?)",
+                [(song_id, perf_id) for song_id in song_ids]
+            )
+    conn.commit()
