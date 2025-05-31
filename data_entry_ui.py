@@ -370,27 +370,36 @@ class DataEntryWindow(tk.Toplevel):
     def handle_proceed(self):
         entry_type = self.entry_type_var.get()
         source_type = self.source_type_var.get()
+        
         for widget in self.content_area_frame.winfo_children():
             widget.destroy()
-        print(f"Proceeding with: Entry={entry_type}, Source={source_type}")
-        if entry_type == "music_video" and source_type == "url":
-            self.build_url_entry_ui(item_name="Music Video")
-            if self._all_mv_url_fields_filled():
-                self._show_mv_url_confirmation_popup()
-            return
-        if entry_type == "performance" and source_type == "url":
-            self.build_url_entry_ui(item_name="Performance")
-            if self._all_performance_url_fields_filled():
-                self._show_performance_url_confirmation_popup()
-            return
-        if entry_type == "music_video" and source_type == "url":
-            self.build_url_entry_ui(item_name="Music Video")
-            if self._all_mv_url_fields_filled():
-                self._show_mv_url_confirmation_popup()
-            return
+        
+        print(f"Proceeding with: Entry={entry_type}, Source={source_type}") # Keep for console feedback
+
+        if source_type == "url":
+            item_name_display = entry_type.replace('_', ' ').title()
+            self.build_url_entry_ui(item_name=item_name_display)
+            
+            # Existing logic to potentially show confirmation popup immediately
+            # This might be better handled by a separate "Save/Confirm" button in a later step
+            if entry_type == "music_video":
+                if self._all_mv_url_fields_filled():
+                    self._show_mv_url_confirmation_popup()
+            elif entry_type == "performance":
+                if self._all_performance_url_fields_filled():
+                    self._show_performance_url_confirmation_popup()
+            return # Done with URL processing
+
+        elif source_type == "local_file":
+            item_name_display = entry_type.replace('_', ' ').title()
+            self.build_local_file_entry_ui(item_name=item_name_display)
+            return # Done with local file UI setup
+
+        # Fallback for any unhandled combination (should ideally not be reached
+        # if entry_type and source_type are always one of the handled values)
         else:
             ttk.Label(self.content_area_frame,
-                      text=f"Placeholder UI for:\nEntry Type: {entry_type.replace('_', ' ').title()}\nSource Type: {source_type.replace('_', ' ').title()}",
+                      text=f"Unhandled Selection:\nEntry Type: {entry_type.replace('_', ' ').title()}\nSource Type: {source_type.replace('_', ' ').title()}",
                       style="DataEntry.TLabel", justify=tk.LEFT).pack(padx=10, pady=20, anchor="w")
 
     def handle_artist_combo_keypress(self, event):
@@ -581,6 +590,20 @@ class DataEntryWindow(tk.Toplevel):
                         resolution_combo['values'] = self.resolution_choices + ["<Add new>"]
                         self.resolution_var.set(new_val)
             resolution_combo.bind("<<ComboboxSelected>>", on_resolution_select)
+
+    def build_local_file_entry_ui(self, item_name):
+        """Builds the placeholder UI for entering data from a local file."""
+        # content_area_frame is already cleared by handle_proceed
+        
+        step_frame = ttk.Frame(self.content_area_frame, style="DataEntry.TFrame")
+        step_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        ttk.Label(step_frame, 
+                  text=f"Local file processing for {item_name}.\n\n(UI for file selection and details will appear here in the next steps.)",
+                  style="DataEntry.TLabel", 
+                  justify=tk.LEFT, 
+                  wraplength=self.content_area_frame.winfo_width() - 40 # Adjust wraplength
+                 ).pack(padx=10, pady=20, anchor="center", expand=True, fill=tk.BOTH)
 
     def update_artists_from_spotify(self):
         # Paths to your scripts
