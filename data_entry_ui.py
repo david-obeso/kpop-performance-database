@@ -30,7 +30,7 @@ FONT_ENTRY_DATA_UI = ("Courier New", 13)
 class DataEntryWindow(tk.Toplevel):
     def __init__(self, master, db_ops): 
         super().__init__(master)
-        self.title("Add or Modify Database Entry")
+        self.title("Add Entry to Database")  # Changed window title
         self.geometry("900x1000")  # Or adjust as needed
         self.configure(bg=DARK_BG)
         self.transient(master)
@@ -328,7 +328,7 @@ class DataEntryWindow(tk.Toplevel):
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
             # 1. URL must not exist in file_path1
-            cursor.execute("SELECT 1 FROM performances WHERE file_path1 = ?", (url,))
+            cursor.execute("SELECT 1 FROM performances WHERE file_url = ?", (url,))
             if cursor.fetchone():
                 confirm_btn.config(state="disabled")
                 validation_label.config(text="A performance with this URL already exists in file_path1.")
