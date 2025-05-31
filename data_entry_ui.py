@@ -229,11 +229,11 @@ class DataEntryWindow(tk.Toplevel):
                 return
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
-            # 1. URL must not already exist in file_path1
-            cursor.execute("SELECT 1 FROM music_videos WHERE file_path1 = ?", (url,))
+            # 1. URL must not already exist in file_url
+            cursor.execute("SELECT 1 FROM music_videos WHERE file_url = ?", (url,)) # Changed file_path1 to file_url
             if cursor.fetchone():
                 confirm_btn.config(state="disabled")
-                validation_label.config(text="A music video with this URL already exists in file_path1.")
+                validation_label.config(text="A music video with this URL already exists.") # Updated message
                 return
             # 2. Primary artist must exist
             cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
@@ -327,11 +327,11 @@ class DataEntryWindow(tk.Toplevel):
                 return
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
-            # 1. URL must not exist in file_path1
-            cursor.execute("SELECT 1 FROM performances WHERE file_path1 = ?", (url,))
+            # 1. URL must not exist in file_url
+            cursor.execute("SELECT 1 FROM performances WHERE file_url = ?", (url,)) # Changed file_path1 to file_url
             if cursor.fetchone():
                 confirm_btn.config(state="disabled")
-                validation_label.config(text="A performance with this URL already exists in file_path1.")
+                validation_label.config(text="A performance with this URL already exists.") # Updated message
                 return
             # 2. Primary artist must exist
             cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
