@@ -321,7 +321,7 @@ class KpopDBBrowser(tk.Tk):
         self.management_frame_for_data_entry = ttk.Frame(self)
         self.management_frame_for_data_entry.pack(fill=tk.X, pady=(10,0), padx=10) 
 
-        add_data_button = ttk.Button(self.management_frame_for_data_entry, text="Add/Modify Data", command=self.open_data_entry_window)
+        add_data_button = ttk.Button(self.management_frame_for_data_entry, text="Add", command=self.open_data_entry_window)
         add_data_button.pack(side=tk.LEFT, padx=5, ipadx=10, ipady=3)
 
         # Play controls frame

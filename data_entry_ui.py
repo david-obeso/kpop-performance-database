@@ -328,7 +328,7 @@ class DataEntryWindow(tk.Toplevel):
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
             # 1. URL must not exist in file_path1
-            cursor.execute("SELECT 1 FROM performances WHERE file_url = ?", (url,))
+            cursor.execute("SELECT 1 FROM performances WHERE file_path1 = ?", (url,))
             if cursor.fetchone():
                 confirm_btn.config(state="disabled")
                 validation_label.config(text="A performance with this URL already exists in file_path1.")
