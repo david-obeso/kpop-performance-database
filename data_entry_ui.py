@@ -877,22 +877,21 @@ class DataEntryWindow(tk.Toplevel):
 
     def confirm_and_save_entry(self, entry_type):
         # Gather all data
-        url = self.url_entry_var.get()
-        primary_artist = self.primary_artist_var.get()
+        url = self.url_entry_var.get().strip()
+        primary_artist = self.primary_artist_var.get().strip()
         secondary_artist = self.secondary_artist_var.get().strip() or None
         songs = self.selected_song_titles
-        title = self.title_var.get()
+        title = self.title_var.get().strip()
         raw_date = self.date_var.get().strip()
         date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
         score = 0 if entry_type == "music_video" else None
-        # --- NEW: collect show_type and resolution if performance+url ---
         show_type_val = None
         resolution_val = None
         if entry_type == "performance" and self.source_type_var.get() == "url":
             show_type_val = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') and self.show_type_var.get().strip() else None
             resolution_val = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') and self.resolution_var.get().strip() else None
 
-        # --- NEW: Duplicate URL check for performance+url ---
+        # --- Duplicate URL check for performance+url ---
         if entry_type == "performance" and self.source_type_var.get() == "url":
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
@@ -901,7 +900,7 @@ class DataEntryWindow(tk.Toplevel):
                 messagebox.showerror("Duplicate URL", "A performance with this URL already exists in the database.", parent=self)
                 return
 
-        # ...existing summary construction...
+        # Build summary for confirmation
         summary = f"Type: {entry_type.replace('_', ' ').title()}\n"
         summary += f"URL: {url}\n"
         summary += f"Primary Artist: {primary_artist}\n"
@@ -917,6 +916,7 @@ class DataEntryWindow(tk.Toplevel):
             summary += f"Score: 0 (fixed)\n"
         else:
             summary += f"Score: (to be set later)\n"
+
         if messagebox.askokcancel("Confirm Entry", f"Please confirm the following data:\n\n{summary}", parent=self):
             try:
                 if entry_type == "music_video":
@@ -929,14 +929,13 @@ class DataEntryWindow(tk.Toplevel):
                         song_titles=self.selected_song_titles
                     )
                 elif entry_type == "performance" and self.source_type_var.get() == "url":
-                    # You must implement insert_performance in db_operations.py to accept show_type and resolution
                     self.db_ops.insert_performance(
                         title=title,
                         performance_date=date,
                         show_type=show_type_val,
                         resolution=resolution_val,
                         file_url=url,
-                        score=None, # Or set as needed
+                        score=None,  # Or set as needed
                         artist_names=[primary_artist] + ([secondary_artist] if secondary_artist else []),
                         song_titles=self.selected_song_titles
                     )
