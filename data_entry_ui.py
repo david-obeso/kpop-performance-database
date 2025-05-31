@@ -740,6 +740,43 @@ class DataEntryWindow(tk.Toplevel):
             file_path1 = self.selected_local_files[0] if self.selected_local_files else None
             file_path2 = self.selected_local_files[1] if len(self.selected_local_files) > 1 else None
 
+            # --- DB-duplication checks ---
+            conn = self.db_ops.get_db_connection()
+            cursor = conn.cursor()
+            # 1. Ensure no selected file is already in DB
+            for path in (file_path1, file_path2):
+                if path:
+                    table = 'performances' if entry_type == 'performance' else 'music_videos'
+                    query = f"SELECT 1 FROM {table} WHERE file_path1 = ? OR file_path2 = ?"
+                    cursor.execute(query, (path, path))
+                    if cursor.fetchone():
+                        messagebox.showerror("Duplicate File", f"The file '{path}' is already in the database.", parent=self)
+                        return
+            # 2. Ensure no existing entry with same artist+title(+date)
+            if entry_type == 'performance':
+                cursor.execute(
+                    """
+                    SELECT 1 FROM performances p
+                    JOIN performance_artist_link pal ON p.performance_id = pal.performance_id
+                    JOIN artists a ON pal.artist_id = a.artist_id
+                    WHERE p.title = ? AND p.performance_date = ? AND a.artist_name = ?
+                    """, (title, date_yyyymmdd, primary_artist)
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT 1 FROM music_videos mv
+                    JOIN music_video_artist_link mval ON mv.mv_id = mval.mv_id
+                    JOIN artists a ON mval.artist_id = a.artist_id
+                    WHERE mv.title = ? AND a.artist_name = ?
+                    """, (title, primary_artist)
+                )
+            if cursor.fetchone():
+                label = 'Performance' if entry_type == 'performance' else 'Music Video'
+                msg = f"A {label.lower()} with the same artist, title{', and date' if entry_type == 'performance' else ''} already exists."
+                messagebox.showerror("Duplicate Entry", msg, parent=self)
+                return
+
             data_to_save = {
                 "Entry Type": entry_type,
                 "Primary Artist": primary_artist,
@@ -1128,6 +1165,43 @@ class DataEntryWindow(tk.Toplevel):
             # For now, just use the first selected file
             file_path1 = self.selected_local_files[0] if self.selected_local_files else None
             file_path2 = self.selected_local_files[1] if len(self.selected_local_files) > 1 else None
+
+            # --- DB-duplication checks ---
+            conn = self.db_ops.get_db_connection()
+            cursor = conn.cursor()
+            # 1. Ensure no selected file is already in DB
+            for path in (file_path1, file_path2):
+                if path:
+                    table = 'performances' if entry_type == 'performance' else 'music_videos'
+                    query = f"SELECT 1 FROM {table} WHERE file_path1 = ? OR file_path2 = ?"
+                    cursor.execute(query, (path, path))
+                    if cursor.fetchone():
+                        messagebox.showerror("Duplicate File", f"The file '{path}' is already in the database.", parent=self)
+                        return
+            # 2. Ensure no existing entry with same artist+title(+date)
+            if entry_type == 'performance':
+                cursor.execute(
+                    """
+                    SELECT 1 FROM performances p
+                    JOIN performance_artist_link pal ON p.performance_id = pal.performance_id
+                    JOIN artists a ON pal.artist_id = a.artist_id
+                    WHERE p.title = ? AND p.performance_date = ? AND a.artist_name = ?
+                    """, (title, date_yyyymmdd, primary_artist)
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT 1 FROM music_videos mv
+                    JOIN music_video_artist_link mval ON mv.mv_id = mval.mv_id
+                    JOIN artists a ON mval.artist_id = a.artist_id
+                    WHERE mv.title = ? AND a.artist_name = ?
+                    """, (title, primary_artist)
+                )
+            if cursor.fetchone():
+                label = 'Performance' if entry_type == 'performance' else 'Music Video'
+                msg = f"A {label.lower()} with the same artist, title{', and date' if entry_type == 'performance' else ''} already exists."
+                messagebox.showerror("Duplicate Entry", msg, parent=self)
+                return
 
             data_to_save = {
                 "Entry Type": entry_type,
