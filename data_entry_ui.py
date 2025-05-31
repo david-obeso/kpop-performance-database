@@ -593,10 +593,10 @@ class DataEntryWindow(tk.Toplevel):
         step_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # --- Section for File Selection ---
-        file_selection_frame = ttk.LabelFrame(step_frame, text=f"A. Select Local File(s) for {item_name}", style="DataEntry.TFrame", padding=10)
+        file_selection_frame = ttk.LabelFrame(step_frame, text=f"A. Select Local File for {item_name}", style="DataEntry.TFrame", padding=10)
         file_selection_frame.pack(fill="x", pady=5, anchor="n")
 
-        browse_button = ttk.Button(file_selection_frame, text="Browse for File(s)...", command=self.browse_local_files, style="DataEntry.TButton")
+        browse_button = ttk.Button(file_selection_frame, text="Browse for File...", command=self.browse_local_files, style="DataEntry.TButton")
         browse_button.pack(anchor="w", pady=(5,2), padx=2)
 
         selected_files_entry = ttk.Entry(file_selection_frame, textvariable=self.local_files_display_var, style="DataEntry.TEntry", state='readonly', width=80)
@@ -623,8 +623,9 @@ class DataEntryWindow(tk.Toplevel):
         self.local_file_validation_label_var.set("") # Clear previous messages
         errors = []
 
-        if not self.selected_local_files:
-            errors.append("- At least one local file must be selected.")
+        # Must have exactly one local file selected
+        if len(self.selected_local_files) != 1:
+            errors.append("- Exactly one local file must be selected.")
         
         if not self.primary_artist_var.get().strip():
             errors.append("- Primary Artist must be selected.")
@@ -681,33 +682,19 @@ class DataEntryWindow(tk.Toplevel):
             ('All files', '*.*')
         )
         
-        filenames = filedialog.askopenfilenames(
-            title='Select Local Media File(s)',
+        filename = filedialog.askopenfilename(
+            title='Select Local Media File',
             filetypes=filetypes,
             parent=self 
         )
-        
-        if filenames: 
-            self.selected_local_files = list(filenames) 
-            if len(self.selected_local_files) == 1:
-                self.local_files_display_var.set(f"Selected: {self.selected_local_files[0]}")
-            else:
-                # Display count and first few basenames if multiple files are selected
-                # Using os.path.basename to show just the filename
-                first_few_basenames = [os.path.basename(f) for f in self.selected_local_files[:3]]
-                display_text = f"{len(self.selected_local_files)} files selected: {', '.join(first_few_basenames)}"
-                if len(self.selected_local_files) > 3:
-                    display_text += "..."
-                self.local_files_display_var.set(display_text)
+        # Only one file allowed
+        if filename:
+            self.selected_local_files = [filename]
+            self.local_files_display_var.set(f"Selected: {filename}")
         else:
-            # User cancelled dialog or selected no new files
-            # If no files were previously selected, keep "No files selected."
-            # If files were previously selected, this will retain their display unless explicitly cleared elsewhere.
-            if not self.selected_local_files: 
-                self.local_file_validation_label_var.set("") # Clear validation if selection is cancelled and was empty
-                self.local_files_display_var.set("No files selected.")
-        # Call validation after file selection changes
-        # self._validate_local_file_data() # Or let user click save to validate
+            self.selected_local_files = []
+            self.local_file_validation_label_var.set("")
+            self.local_files_display_var.set("No files selected.")
 
     def confirm_and_save_entry(self, entry_type, source_type="url"): # Added source_type
         print(f"Attempting to save: Entry Type='{entry_type}', Source Type='{source_type}'")
@@ -729,29 +716,26 @@ class DataEntryWindow(tk.Toplevel):
             # Reset fields after successful save from URL (handled by popup closing or here)
 
         elif source_type == "local_file":
-            # Placeholder for local file saving logic
+            # Placeholder for single local file saving logic
             primary_artist = self.primary_artist_var.get().strip()
             secondary_artist = self.secondary_artist_var.get().strip() if hasattr(self, 'secondary_artist_var') and self.secondary_artist_var.get() else None
             song_titles = self.selected_song_titles
             title = self.title_var.get().strip()
-            date_yyyymmdd = self.date_var.get().strip() # Assuming YYMMDD, convert if needed for DB
-            
-            # For now, just use the first selected file
+            date_yyyymmdd = self.date_var.get().strip()  # Assuming YYMMDD
+            # Only support one selected file
             file_path1 = self.selected_local_files[0] if self.selected_local_files else None
-            file_path2 = self.selected_local_files[1] if len(self.selected_local_files) > 1 else None
 
             # --- DB-duplication checks ---
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
-            # 1. Ensure no selected file is already in DB
-            for path in (file_path1, file_path2):
-                if path:
-                    table = 'performances' if entry_type == 'performance' else 'music_videos'
-                    query = f"SELECT 1 FROM {table} WHERE file_path1 = ? OR file_path2 = ?"
-                    cursor.execute(query, (path, path))
-                    if cursor.fetchone():
-                        messagebox.showerror("Duplicate File", f"The file '{path}' is already in the database.", parent=self)
-                        return
+            # 1. Ensure selected file is not already in DB
+            if file_path1:
+                table = 'performances' if entry_type == 'performance' else 'music_videos'
+                query = f"SELECT 1 FROM {table} WHERE file_path1 = ?"
+                cursor.execute(query, (file_path1,))
+                if cursor.fetchone():
+                    messagebox.showerror("Duplicate File", f"The file '{file_path1}' is already in the database.", parent=self)
+                    return
             # 2. Ensure no existing entry with same artist+title(+date)
             if entry_type == 'performance':
                 cursor.execute(
@@ -784,13 +768,12 @@ class DataEntryWindow(tk.Toplevel):
                 "Song Titles": song_titles,
                 "Title": title,
                 "Date (YYMMDD)": date_yyyymmdd,
-                "File Path 1": file_path1,
-                "File Path 2": file_path2,
+                "File Path": file_path1,
             }
 
             if entry_type == "performance":
-                data_to_save["Show Type"] = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else "N/A"
-                data_to_save["Resolution"] = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else "N/A"
+                data_to_save["Show Type"] = self.show_type_var.get().strip()
+                data_to_save["Resolution"] = self.resolution_var.get().strip()
             
             # --- Placeholder: Show data that would be saved ---
             info_message = "The following data would be saved for a local file entry:\n\n"
@@ -799,17 +782,10 @@ class DataEntryWindow(tk.Toplevel):
             
             messagebox.showinfo("Local File Save (Placeholder)", info_message, parent=self)
             
-            # Future: Call actual db_ops.add_performance or db_ops.add_music_video
-            # with local file paths.
-            # Example:
-            # if entry_type == "performance":
-            #     self.db_ops.add_performance(title=title, date_str=date_yyyymmdd, ...) # adapt parameters
-            # elif entry_type == "music_video":
-            #     self.db_ops.add_music_video(title=title, date_str=date_yyyymmdd, ...) # adapt parameters
+            # Future: Call actual db_ops.add_performance or db_ops.add_music_video with file_path1
 
             # After successful save, you might want to reset fields or close the window
-            # self.reset_form_fields() # A new method to clear all relevant fields
-            # self.close_window()
+            # self.reset_form_fields() or self.close_window()
 
         else:
             messagebox.showerror("Error", f"Unknown source type: {source_type}", parent=self)
@@ -1155,29 +1131,26 @@ class DataEntryWindow(tk.Toplevel):
             # Reset fields after successful save from URL (handled by popup closing or here)
 
         elif source_type == "local_file":
-            # Placeholder for local file saving logic
+            # Placeholder for single local file saving logic
             primary_artist = self.primary_artist_var.get().strip()
             secondary_artist = self.secondary_artist_var.get().strip() if hasattr(self, 'secondary_artist_var') and self.secondary_artist_var.get() else None
             song_titles = self.selected_song_titles
             title = self.title_var.get().strip()
-            date_yyyymmdd = self.date_var.get().strip() # Assuming YYMMDD, convert if needed for DB
-            
-            # For now, just use the first selected file
+            date_yyyymmdd = self.date_var.get().strip()  # Assuming YYMMDD
+            # Only support one selected file
             file_path1 = self.selected_local_files[0] if self.selected_local_files else None
-            file_path2 = self.selected_local_files[1] if len(self.selected_local_files) > 1 else None
 
             # --- DB-duplication checks ---
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
-            # 1. Ensure no selected file is already in DB
-            for path in (file_path1, file_path2):
-                if path:
-                    table = 'performances' if entry_type == 'performance' else 'music_videos'
-                    query = f"SELECT 1 FROM {table} WHERE file_path1 = ? OR file_path2 = ?"
-                    cursor.execute(query, (path, path))
-                    if cursor.fetchone():
-                        messagebox.showerror("Duplicate File", f"The file '{path}' is already in the database.", parent=self)
-                        return
+            # 1. Ensure selected file is not already in DB
+            if file_path1:
+                table = 'performances' if entry_type == 'performance' else 'music_videos'
+                query = f"SELECT 1 FROM {table} WHERE file_path1 = ?"
+                cursor.execute(query, (file_path1,))
+                if cursor.fetchone():
+                    messagebox.showerror("Duplicate File", f"The file '{file_path1}' is already in the database.", parent=self)
+                    return
             # 2. Ensure no existing entry with same artist+title(+date)
             if entry_type == 'performance':
                 cursor.execute(
@@ -1210,13 +1183,12 @@ class DataEntryWindow(tk.Toplevel):
                 "Song Titles": song_titles,
                 "Title": title,
                 "Date (YYMMDD)": date_yyyymmdd,
-                "File Path 1": file_path1,
-                "File Path 2": file_path2,
+                "File Path": file_path1,
             }
 
             if entry_type == "performance":
-                data_to_save["Show Type"] = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else "N/A"
-                data_to_save["Resolution"] = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else "N/A"
+                data_to_save["Show Type"] = self.show_type_var.get().strip()
+                data_to_save["Resolution"] = self.resolution_var.get().strip()
             
             # --- Placeholder: Show data that would be saved ---
             info_message = "The following data would be saved for a local file entry:\n\n"
@@ -1225,17 +1197,10 @@ class DataEntryWindow(tk.Toplevel):
             
             messagebox.showinfo("Local File Save (Placeholder)", info_message, parent=self)
             
-            # Future: Call actual db_ops.add_performance or db_ops.add_music_video
-            # with local file paths.
-            # Example:
-            # if entry_type == "performance":
-            #     self.db_ops.add_performance(title=title, date_str=date_yyyymmdd, ...) # adapt parameters
-            # elif entry_type == "music_video":
-            #     self.db_ops.add_music_video(title=title, date_str=date_yyyymmdd, ...) # adapt parameters
+            # Future: Call actual db_ops.add_performance or db_ops.add_music_video with file_path1
 
             # After successful save, you might want to reset fields or close the window
-            # self.reset_form_fields() # A new method to clear all relevant fields
-            # self.close_window()
+            # self.reset_form_fields() or self.close_window()
 
         else:
             messagebox.showerror("Error", f"Unknown source type: {source_type}", parent=self)
