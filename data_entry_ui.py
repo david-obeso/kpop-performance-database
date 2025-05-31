@@ -1,9 +1,9 @@
 # data_entry_ui.py
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog # Added filedialog
 import subprocess
 import sys
-import os
+import os # Added os for os.path.basename
 import webbrowser
 import datetime
 try:
@@ -113,6 +113,11 @@ class DataEntryWindow(tk.Toplevel):
         self.selected_song_ids = []  # List of selected song_id
         self.selected_song_titles = []  # Parallel list of song titles for display
 
+        # Variables for local file processing
+        self.selected_local_files = [] 
+        self.local_files_display_var = tk.StringVar()
+        self.local_files_display_var.set("No files selected.") # Initial value
+
         button_frame = ttk.Frame(main_frame, style="DataEntry.TFrame")
         button_frame.pack(fill="x", pady=(10, 0), side=tk.BOTTOM)
 
@@ -161,6 +166,10 @@ class DataEntryWindow(tk.Toplevel):
         )
         self.current_content_placeholder_label.pack(padx=10, pady=20, anchor="center")
         self.url_entry_var.set("")
+        # Reset local file specific variables
+        self.selected_local_files = []
+        self.local_files_display_var.set("No files selected.")
+        
         self.proceed_button.config(state=tk.NORMAL)  # <-- Always enable here
 
     def _all_mv_url_fields_filled(self):
@@ -592,18 +601,62 @@ class DataEntryWindow(tk.Toplevel):
             resolution_combo.bind("<<ComboboxSelected>>", on_resolution_select)
 
     def build_local_file_entry_ui(self, item_name):
-        """Builds the placeholder UI for entering data from a local file."""
+        """Builds the UI for selecting local files and entering their details."""
         # content_area_frame is already cleared by handle_proceed
         
         step_frame = ttk.Frame(self.content_area_frame, style="DataEntry.TFrame")
         step_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        ttk.Label(step_frame, 
-                  text=f"Local file processing for {item_name}.\n\n(UI for file selection and details will appear here in the next steps.)",
-                  style="DataEntry.TLabel", 
-                  justify=tk.LEFT, 
-                  wraplength=self.content_area_frame.winfo_width() - 40 # Adjust wraplength
-                 ).pack(padx=10, pady=20, anchor="center", expand=True, fill=tk.BOTH)
+        # --- Section for File Selection ---
+        file_selection_frame = ttk.LabelFrame(step_frame, text=f"A. Select Local File(s) for {item_name}", style="DataEntry.TFrame", padding=10)
+        file_selection_frame.pack(fill="x", pady=5, anchor="n")
+
+        browse_button = ttk.Button(file_selection_frame, text="Browse for File(s)...", command=self.browse_local_files, style="DataEntry.TButton")
+        browse_button.pack(anchor="w", pady=(5,2), padx=2)
+
+        # Label to display selected files
+        # self.local_files_display_var is already initialized and reset appropriately
+        selected_files_label = ttk.Label(file_selection_frame, textvariable=self.local_files_display_var, style="DataEntry.TLabel", wraplength=700, justify=tk.LEFT)
+        selected_files_label.pack(anchor="w", pady=(2,5), fill="x", padx=2)
+        
+        # --- Placeholder for B. Enter Details (Artist, Title, Date etc.) ---
+        details_frame_placeholder = ttk.LabelFrame(step_frame, text="B. Enter Details (coming next)", style="DataEntry.TFrame", padding=10)
+        details_frame_placeholder.pack(fill="x", pady=10, anchor="n")
+        ttk.Label(details_frame_placeholder, text="Fields for Artist, Title, Date, etc., will appear here.", style="DataEntry.TLabel").pack(padx=5, pady=5)
+
+    def browse_local_files(self):
+        """Opens a file dialog to select local media files and updates the display."""
+        filetypes = (
+            ('Media files', '*.mp4 *.mkv *.avi *.mov *.webm *.flv *.wmv *.mp3 *.wav *.flac *.aac *.ogg'),
+            ('Video files', '*.mp4 *.mkv *.avi *.mov *.webm *.flv *.wmv'),
+            ('Audio files', '*.mp3 *.wav *.flac *.aac *.ogg'),
+            ('All files', '*.*')
+        )
+        
+        filenames = filedialog.askopenfilenames(
+            title='Select Local Media File(s)',
+            filetypes=filetypes,
+            parent=self 
+        )
+        
+        if filenames: 
+            self.selected_local_files = list(filenames) 
+            if len(self.selected_local_files) == 1:
+                self.local_files_display_var.set(f"Selected: {self.selected_local_files[0]}")
+            else:
+                # Display count and first few basenames if multiple files are selected
+                # Using os.path.basename to show just the filename
+                first_few_basenames = [os.path.basename(f) for f in self.selected_local_files[:3]]
+                display_text = f"{len(self.selected_local_files)} files selected: {', '.join(first_few_basenames)}"
+                if len(self.selected_local_files) > 3:
+                    display_text += "..."
+                self.local_files_display_var.set(display_text)
+        else:
+            # User cancelled dialog or selected no new files
+            # If no files were previously selected, keep "No files selected."
+            # If files were previously selected, this will retain their display unless explicitly cleared elsewhere.
+            if not self.selected_local_files: 
+                self.local_files_display_var.set("No files selected.")
 
     def update_artists_from_spotify(self):
         # Paths to your scripts
