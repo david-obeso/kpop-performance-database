@@ -614,10 +614,10 @@ class DataEntryWindow(tk.Toplevel):
         browse_button = ttk.Button(file_selection_frame, text="Browse for File(s)...", command=self.browse_local_files, style="DataEntry.TButton")
         browse_button.pack(anchor="w", pady=(5,2), padx=2)
 
-        # Label to display selected files
+        # Entry to display selected files (readonly for copying)
         # self.local_files_display_var is already initialized and reset appropriately
-        selected_files_label = ttk.Label(file_selection_frame, textvariable=self.local_files_display_var, style="DataEntry.TLabel", wraplength=700, justify=tk.LEFT)
-        selected_files_label.pack(anchor="w", pady=(2,5), fill="x", padx=2)
+        selected_files_entry = ttk.Entry(file_selection_frame, textvariable=self.local_files_display_var, style="DataEntry.TEntry", state='readonly', width=80) # Adjust width as needed
+        selected_files_entry.pack(anchor="w", pady=(2,5), fill="x", padx=2)
         
         # --- Placeholder for B. Enter Details (Artist, Title, Date etc.) ---
         details_frame_placeholder = ttk.LabelFrame(step_frame, text="B. Enter Details (coming next)", style="DataEntry.TFrame", padding=10)
