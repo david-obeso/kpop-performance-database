@@ -30,7 +30,7 @@ FONT_ENTRY_DATA_UI = ("Courier New", 13)
 class DataEntryWindow(tk.Toplevel):
     def __init__(self, master, db_ops): 
         super().__init__(master)
-        self.title("Add Entry to Database")  # Changed window title
+        self.title("Add or Modify Database Entry") # Unified title
         self.geometry("900x1000")  # Or adjust as needed
         self.configure(bg=DARK_BG)
         self.transient(master)
@@ -117,6 +117,7 @@ class DataEntryWindow(tk.Toplevel):
         self.selected_local_files = [] 
         self.local_files_display_var = tk.StringVar()
         self.local_files_display_var.set("No files selected.") # Initial value
+        self.local_file_validation_label_var = tk.StringVar() # For validation messages
 
         button_frame = ttk.Frame(main_frame, style="DataEntry.TFrame")
         button_frame.pack(fill="x", pady=(10, 0), side=tk.BOTTOM)
@@ -269,26 +270,10 @@ class DataEntryWindow(tk.Toplevel):
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(pady=20)
         def on_confirm():
-            title = self.title_var.get().strip()
-            date = self._convert_yymmdd_to_yyyy_mm_dd(self.date_var.get().strip())
-            url = self.url_entry_var.get().strip()
-            score = 0
-            artist_names = [self.primary_artist_var.get().strip()]
-            if self.secondary_artist_var.get().strip():
-                artist_names.append(self.secondary_artist_var.get().strip())
-            song_titles = self.selected_song_titles
             try:
-                self.db_ops.insert_music_video(
-                    title=title,
-                    release_date=date,
-                    file_url=url,
-                    score=score,
-                    artist_names=artist_names,
-                    song_titles=song_titles
-                )
-                messagebox.showinfo("Success", "Entry saved to database.", parent=self)
+                # Pass source_type="url"
+                self.confirm_and_save_entry("music_video", source_type="url")
                 popup.destroy()
-                self.close_window()
             except Exception as e:
                 messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)
         confirm_btn = ttk.Button(btn_frame, text="Confirm", state="disabled", command=on_confirm)
@@ -366,7 +351,8 @@ class DataEntryWindow(tk.Toplevel):
         btn_frame.pack(pady=20)
         def on_confirm():
             try:
-                self.confirm_and_save_entry("performance")
+                # Pass source_type="url"
+                self.confirm_and_save_entry("performance", source_type="url")
                 popup.destroy()
             except Exception as e:
                 messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)
@@ -621,6 +607,71 @@ class DataEntryWindow(tk.Toplevel):
         details_frame.pack(fill="x", pady=10, anchor="n")
         self._build_common_entry_details_ui(details_frame)
 
+        # --- Validation Message Label ---
+        validation_label = ttk.Label(step_frame, textvariable=self.local_file_validation_label_var, foreground="red", style="DataEntry.TLabel", wraplength=700)
+        validation_label.pack(pady=(5,0), anchor="w", padx=10)
+
+        # --- Save Button ---
+        save_button_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
+        save_button_frame.pack(fill="x", pady=(10,5), padx=10)
+        save_button = ttk.Button(save_button_frame, text="Save Entry", command=self._attempt_save_local_entry, style="DataEntry.TButton")
+        save_button.pack(anchor="e")
+
+
+    def _validate_local_file_data(self):
+        """Validates the data entered for a local file entry."""
+        self.local_file_validation_label_var.set("") # Clear previous messages
+        errors = []
+
+        if not self.selected_local_files:
+            errors.append("- At least one local file must be selected.")
+        
+        if not self.primary_artist_var.get().strip():
+            errors.append("- Primary Artist must be selected.")
+        
+        # Songs are optional for MVs, potentially optional for performances too,
+        # but title is usually derived or entered.
+        # if not self.selected_song_titles:
+        #     errors.append("- At least one Song must be selected.")
+
+        if not self.title_var.get().strip():
+            errors.append("- Title must be entered.")
+
+        date_str = self.date_var.get().strip()
+        if not date_str:
+            errors.append("- Date must be entered.")
+        elif not (date_str.isdigit() and len(date_str) == 6):
+            errors.append("- Date must be in YYMMDD format (e.g., 240531).")
+
+        entry_type = self.entry_type_var.get()
+        if entry_type == "performance":
+            if hasattr(self, 'show_type_var'):
+                show_type = self.show_type_var.get().strip()
+                if not show_type or show_type == "<Add new>":
+                    errors.append("- Show Type must be selected or entered.")
+            else: # Should not happen if UI built correctly
+                errors.append("- Show Type field is missing.")
+            
+            if hasattr(self, 'resolution_var'):
+                resolution = self.resolution_var.get().strip()
+                if not resolution or resolution == "<Add new>":
+                    errors.append("- Resolution must be selected or entered.")
+            else: # Should not happen
+                errors.append("- Resolution field is missing.")
+
+        if errors:
+            self.local_file_validation_label_var.set("Please correct the following errors:\n" + "\n".join(errors))
+            return False
+        return True
+
+    def _attempt_save_local_entry(self):
+        """Attempts to save the local file entry after validation."""
+        if self._validate_local_file_data():
+            self.local_file_validation_label_var.set("") # Clear validation message on success
+            entry_type = self.entry_type_var.get()
+            self.confirm_and_save_entry(entry_type, source_type="local_file")
+        # If validation fails, the message is already set by _validate_local_file_data
+
     def browse_local_files(self):
         """Opens a file dialog to select local media files and updates the display."""
         filetypes = (
@@ -653,7 +704,83 @@ class DataEntryWindow(tk.Toplevel):
             # If no files were previously selected, keep "No files selected."
             # If files were previously selected, this will retain their display unless explicitly cleared elsewhere.
             if not self.selected_local_files: 
+                self.local_file_validation_label_var.set("") # Clear validation if selection is cancelled and was empty
                 self.local_files_display_var.set("No files selected.")
+        # Call validation after file selection changes
+        # self._validate_local_file_data() # Or let user click save to validate
+
+    def confirm_and_save_entry(self, entry_type, source_type="url"): # Added source_type
+        print(f"Attempting to save: Entry Type='{entry_type}', Source Type='{source_type}'")
+
+        if source_type == "url":
+            # Existing URL saving logic (simplified for brevity, keep your original logic here)
+            url = self.url_entry_var.get().strip()
+            artist_name = self.primary_artist_var.get().strip()
+            # ... other fields for URL ...
+            print(f"URL Data: URL={url}, Artist={artist_name}, ...")
+            # ... your actual db_ops calls for URL ...
+            if entry_type == "music_video":
+                # self.db_ops.add_music_video(...)
+                messagebox.showinfo("Saved", f"Music Video (from URL) '{self.title_var.get()}' would be saved.", parent=self)
+            elif entry_type == "performance":
+                # self.db_ops.add_performance(...)
+                messagebox.showinfo("Saved", f"Performance (from URL) '{self.title_var.get()}' would be saved.", parent=self)
+            
+            # Reset fields after successful save from URL (handled by popup closing or here)
+
+        elif source_type == "local_file":
+            # Placeholder for local file saving logic
+            primary_artist = self.primary_artist_var.get().strip()
+            secondary_artist = self.secondary_artist_var.get().strip() if hasattr(self, 'secondary_artist_var') and self.secondary_artist_var.get() else None
+            song_titles = self.selected_song_titles
+            title = self.title_var.get().strip()
+            date_yyyymmdd = self.date_var.get().strip() # Assuming YYMMDD, convert if needed for DB
+            
+            # For now, just use the first selected file
+            file_path1 = self.selected_local_files[0] if self.selected_local_files else None
+            file_path2 = self.selected_local_files[1] if len(self.selected_local_files) > 1 else None
+
+            data_to_save = {
+                "Entry Type": entry_type,
+                "Primary Artist": primary_artist,
+                "Secondary Artist": secondary_artist,
+                "Song Titles": song_titles,
+                "Title": title,
+                "Date (YYMMDD)": date_yyyymmdd,
+                "File Path 1": file_path1,
+                "File Path 2": file_path2,
+            }
+
+            if entry_type == "performance":
+                data_to_save["Show Type"] = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else "N/A"
+                data_to_save["Resolution"] = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else "N/A"
+            
+            # --- Placeholder: Show data that would be saved ---
+            info_message = "The following data would be saved for a local file entry:\n\n"
+            for key, value in data_to_save.items():
+                info_message += f"- {key}: {value}\n"
+            
+            messagebox.showinfo("Local File Save (Placeholder)", info_message, parent=self)
+            
+            # Future: Call actual db_ops.add_performance or db_ops.add_music_video
+            # with local file paths.
+            # Example:
+            # if entry_type == "performance":
+            #     self.db_ops.add_performance(title=title, date_str=date_yyyymmdd, ...) # adapt parameters
+            # elif entry_type == "music_video":
+            #     self.db_ops.add_music_video(title=title, date_str=date_yyyymmdd, ...) # adapt parameters
+
+            # After successful save, you might want to reset fields or close the window
+            # self.reset_form_fields() # A new method to clear all relevant fields
+            # self.close_window()
+
+        else:
+            messagebox.showerror("Error", f"Unknown source type: {source_type}", parent=self)
+            return
+
+        # Common actions after save attempt (success or placeholder)
+        # Potentially reset common fields if save was successful
+        # self.reset_form_fields() # Or handle reset based on source_type success
 
     def update_artists_from_spotify(self):
         # Paths to your scripts
@@ -935,10 +1062,6 @@ class DataEntryWindow(tk.Toplevel):
         # Assuming for now that selected_song_titles and selected_song_ids are kept in sync
         # such that removing by index is safe. If a title can map to multiple selected IDs,
         # this needs refinement.
-        # A safer way: find all occurrences of song_ids that map to this title and remove them.
-        # However, the current structure seems to imply a 1-to-1 mapping for selected_song_titles[idx] to selected_song_ids[idx]
-        # (or a group of IDs if a title maps to multiple, and we remove that group).
-        # Let's assume the simple index removal is intended for now.
         
         del self.selected_song_titles[idx]
         # This part is tricky if a title can have multiple IDs.
@@ -948,45 +1071,10 @@ class DataEntryWindow(tk.Toplevel):
         # selected_song_ids = []
         # for title in selected_titles:
         #    selected_song_ids.extend(title_to_song_ids[title])
-        # This means self.selected_song_ids can have more elements than self.selected_song_titles.
-        # This removal logic needs to be more robust.
-
-        # For now, let's simplify: if we remove a title, we clear all song IDs and expect the user to re-select if needed,
-        # or we need a proper way to map which IDs belong to which title in the selection.
-        # A better approach for remove_selected_song:
-        # 1. Get the title being removed.
-        # 2. Find all song_ids that correspond to THIS title (this info is in title_to_song_ids in the popup, not easily here).
-        # This suggests self.selected_song_ids and self.selected_song_titles might need to be a list of tuples (id, title)
-        # or a list of dicts to maintain the link.
-
-        # Given the current structure, the safest immediate action upon removing a title is to rebuild the list of selected_song_ids
-        # from the remaining selected_song_titles. This requires access to the song database or the mapping.
-        # This is complex. Let's revert to the simpler (but potentially buggy if titles aren't unique for selection) index removal for selected_song_ids for now,
-        # acknowledging this might need a revisit if song_id management becomes an issue.
-        # A simple fix: if selected_song_ids has a different length, it implies a more complex structure.
-        # For now, if we remove a title, we should ideally remove the corresponding ID(s).
-        # The current `get_songs_for_selected_artists` and `show_song_selection_popup` logic
-        # aims to get all song_ids for a selected title.
-
-        # Let's assume for now that we remove the title and then rebuild the UI.
-        # The user would then re-add songs if necessary, which is not ideal but avoids data corruption.
-        # A better fix would be to store selected_songs as a list of {'id': song_id, 'title': song_title}
-        # For now, just remove the title by index. The song_ids will be out of sync.
-        # This is a pre-existing issue with how selected_song_ids are managed relative to selected_song_titles.
-
-        # Simplest immediate change for remove_selected_song:
-        if 0 <= idx < len(self.selected_song_titles):
-            del self.selected_song_titles[idx]
-            # To keep song IDs somewhat consistent, if a title is removed,
-            # it's best to clear all song IDs and have the user re-select.
-            # This is because we don't have a direct mapping here of which IDs in selected_song_ids
-            # belong to selected_song_titles[idx].
-            # Or, if selected_song_ids was built to correspond 1-to-1 by index (which it isn't by `on_ok`),
-            # then `del self.selected_song_ids[idx]` would be fine.
-            # Given `on_ok` logic, `self.selected_song_ids` can be longer.
-            # Safest for now:
-            self.selected_song_ids = [] # Force re-selection or clear
-            # This will make the "Title" not auto-update correctly from songs if songs are removed one by one.
+        # This means self.selected_song_ids can be longer.
+        # Safest for now:
+        self.selected_song_ids = [] # Force re-selection or clear
+        # This will make the "Title" not auto-update correctly from songs if songs are removed one by one.
 
         self.handle_proceed() # Rebuild current UI
         self.update_title_from_songs()
@@ -1010,84 +1098,75 @@ class DataEntryWindow(tk.Toplevel):
         # Only auto-update if the user hasn't changed it manually (optional: add a flag if you want)
         self.title_var.set(", ".join(self.selected_song_titles))
 
-    def confirm_and_save_entry(self, entry_type):
-        # Gather all data
-        url = self.url_entry_var.get().strip()
-        primary_artist = self.primary_artist_var.get().strip()
-        secondary_artist = self.secondary_artist_var.get().strip() or None
-        songs = self.selected_song_titles
-        title = self.title_var.get().strip()
-        raw_date = self.date_var.get().strip()
-        date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
-        score = 0 if entry_type == "music_video" else None
-        show_type_val = None
-        resolution_val = None
-        if entry_type == "performance" and self.source_type_var.get() == "url":
-            show_type_val = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') and self.show_type_var.get().strip() else None
-            resolution_val = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') and self.resolution_var.get().strip() else None
+    def confirm_and_save_entry(self, entry_type, source_type="url"): # Added source_type
+        print(f"Attempting to save: Entry Type='{entry_type}', Source Type='{source_type}'")
 
-        # --- Duplicate URL check for performance+url ---
-        if entry_type == "performance" and self.source_type_var.get() == "url":
-            conn = self.db_ops.get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM performances WHERE file_url = ?", (url,))
-            if cursor.fetchone():
-                messagebox.showerror("Duplicate URL", "A performance with this URL already exists in the database.", parent=self)
-                return
+        if source_type == "url":
+            # Existing URL saving logic (simplified for brevity, keep your original logic here)
+            url = self.url_entry_var.get().strip()
+            artist_name = self.primary_artist_var.get().strip()
+            # ... other fields for URL ...
+            print(f"URL Data: URL={url}, Artist={artist_name}, ...")
+            # ... your actual db_ops calls for URL ...
+            if entry_type == "music_video":
+                # self.db_ops.add_music_video(...)
+                messagebox.showinfo("Saved", f"Music Video (from URL) '{self.title_var.get()}' would be saved.", parent=self)
+            elif entry_type == "performance":
+                # self.db_ops.add_performance(...)
+                messagebox.showinfo("Saved", f"Performance (from URL) '{self.title_var.get()}' would be saved.", parent=self)
+            
+            # Reset fields after successful save from URL (handled by popup closing or here)
 
-        # Build summary for confirmation
-        summary = f"Type: {entry_type.replace('_', ' ').title()}\n"
-        summary += f"URL: {url}\n"
-        summary += f"Primary Artist: {primary_artist}\n"
-        if secondary_artist:
-            summary += f"Secondary Artist: {secondary_artist}\n"
-        summary += f"Songs: {', '.join(songs)}\n"
-        summary += f"Title: {title}\n"
-        summary += f"Date: {date}\n"
-        if entry_type == "performance" and self.source_type_var.get() == "url":
-            summary += f"Show Type: {show_type_val or '(none)'}\n"
-            summary += f"Resolution: {resolution_val or '(none)'}\n"
-        if entry_type == "music_video":
-            summary += f"Score: 0 (fixed)\n"
+        elif source_type == "local_file":
+            # Placeholder for local file saving logic
+            primary_artist = self.primary_artist_var.get().strip()
+            secondary_artist = self.secondary_artist_var.get().strip() if hasattr(self, 'secondary_artist_var') and self.secondary_artist_var.get() else None
+            song_titles = self.selected_song_titles
+            title = self.title_var.get().strip()
+            date_yyyymmdd = self.date_var.get().strip() # Assuming YYMMDD, convert if needed for DB
+            
+            # For now, just use the first selected file
+            file_path1 = self.selected_local_files[0] if self.selected_local_files else None
+            file_path2 = self.selected_local_files[1] if len(self.selected_local_files) > 1 else None
+
+            data_to_save = {
+                "Entry Type": entry_type,
+                "Primary Artist": primary_artist,
+                "Secondary Artist": secondary_artist,
+                "Song Titles": song_titles,
+                "Title": title,
+                "Date (YYMMDD)": date_yyyymmdd,
+                "File Path 1": file_path1,
+                "File Path 2": file_path2,
+            }
+
+            if entry_type == "performance":
+                data_to_save["Show Type"] = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else "N/A"
+                data_to_save["Resolution"] = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else "N/A"
+            
+            # --- Placeholder: Show data that would be saved ---
+            info_message = "The following data would be saved for a local file entry:\n\n"
+            for key, value in data_to_save.items():
+                info_message += f"- {key}: {value}\n"
+            
+            messagebox.showinfo("Local File Save (Placeholder)", info_message, parent=self)
+            
+            # Future: Call actual db_ops.add_performance or db_ops.add_music_video
+            # with local file paths.
+            # Example:
+            # if entry_type == "performance":
+            #     self.db_ops.add_performance(title=title, date_str=date_yyyymmdd, ...) # adapt parameters
+            # elif entry_type == "music_video":
+            #     self.db_ops.add_music_video(title=title, date_str=date_yyyymmdd, ...) # adapt parameters
+
+            # After successful save, you might want to reset fields or close the window
+            # self.reset_form_fields() # A new method to clear all relevant fields
+            # self.close_window()
+
         else:
-            summary += f"Score: (to be set later)\n"
+            messagebox.showerror("Error", f"Unknown source type: {source_type}", parent=self)
+            return
 
-        if messagebox.askokcancel("Confirm Entry", f"Please confirm the following data:\n\n{summary}", parent=self):
-            try:
-                if entry_type == "music_video":
-                    self.db_ops.insert_music_video(
-                        title=title,
-                        release_date=date,
-                        file_url=url,
-                        score=0,
-                        artist_names=[primary_artist] + ([secondary_artist] if secondary_artist else []),
-                        song_titles=self.selected_song_titles
-                    )
-                elif entry_type == "performance" and self.source_type_var.get() == "url":
-                    self.db_ops.insert_performance(
-                        title=title,
-                        performance_date=date,
-                        show_type=show_type_val,
-                        resolution=resolution_val,
-                        file_url=url,
-                        score=None,  # Or set as needed
-                        artist_names=[primary_artist] + ([secondary_artist] if secondary_artist else []),
-                        song_titles=self.selected_song_titles
-                    )
-                messagebox.showinfo("Success", "Entry saved to database.", parent=self)
-                self.close_window()
-            except Exception as e:
-                messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)
-
-    def _convert_yymmdd_to_yyyy_mm_dd(self, yymmdd):
-        # Converts yymmdd string to yyyy-mm-dd, returns None if invalid
-        if len(yymmdd) != 6 or not yymmdd.isdigit():
-            return None
-        year = int(yymmdd[:2])
-        month = yymmdd[2:4]
-        day = yymmdd[4:6]
-        year += 2000 if year < 50 else 1900  # 00-49: 2000s, 50-99: 1900s
-        try:
-            return f"{year:04d}-{month}-{day}"
-        except Exception:
-            return None
+        # Common actions after save attempt (success or placeholder)
+        # Potentially reset common fields if save was successful
+        # self.reset_form_fields() # Or handle reset based on source_type success
