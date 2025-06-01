@@ -6,6 +6,7 @@ import sys
 import os # Added os for os.path.basename
 import webbrowser
 import datetime
+import config  # For MPV_PLAYER_PATH
 try:
     from tkcalendar import DateEntry
     HAS_TKCALENDAR = True
@@ -625,7 +626,10 @@ class DataEntryWindow(tk.Toplevel):
         save_button_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
         save_button_frame.pack(fill="x", pady=(10,5), padx=10)
         save_button = ttk.Button(save_button_frame, text="Save Entry", command=self._attempt_save_local_entry, style="DataEntry.TButton")
-        save_button.pack(anchor="e")
+        save_button.pack(side=tk.RIGHT, padx=5)
+        # Button to play the selected media file
+        self.play_button = ttk.Button(save_button_frame, text="Play Selected File", command=self.play_selected_file, style="DataEntry.TButton", state=tk.DISABLED)
+        self.play_button.pack(side=tk.RIGHT, padx=5)
 
 
     def _validate_local_file_data(self):
@@ -754,10 +758,16 @@ class DataEntryWindow(tk.Toplevel):
                 pass
             self.selected_local_files = [filename]
             self.local_files_display_var.set(f"Selected: {filename}")
+            # Enable play button when a file is selected
+            if hasattr(self, 'play_button'):
+                self.play_button.config(state=tk.NORMAL)
         else:
             self.selected_local_files = []
             self.local_file_validation_label_var.set("")
             self.local_files_display_var.set("No files selected.")
+            # Disable play button when no file is selected
+            if hasattr(self, 'play_button'):
+                self.play_button.config(state=tk.DISABLED)
 
     def confirm_and_save_entry(self, entry_type, source_type="url"): # Added source_type
         print(f"Attempting to save: Entry Type='{entry_type}', Source Type='{source_type}'")
@@ -1290,3 +1300,19 @@ class DataEntryWindow(tk.Toplevel):
         # Common actions after save attempt (success or placeholder)
         # Potentially reset common fields if save was successful
         # self.reset_form_fields() # Or handle reset based on source_type success
+
+    def play_selected_file(self):
+        """Plays the selected local file using MPV player or webbrowser."""
+        if not self.selected_local_files:
+            return
+        file_path = self.selected_local_files[0]
+        try:
+            # Warm up drive by reading first byte
+            with open(file_path, 'rb') as f:
+                f.read(1)
+            subprocess.Popen([config.MPV_PLAYER_PATH, file_path])
+        except Exception as e:
+            try:
+                webbrowser.open_new(file_path)
+            except Exception:
+                messagebox.showerror("Playback Error", f"Could not play file: {e}", parent=self)
