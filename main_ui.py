@@ -235,7 +235,8 @@ class KpopDBBrowser(tk.Tk):
         # --- New variables for filtering ---
         self.show_mv_var = tk.BooleanVar(value=True)
         self.show_perf_var = tk.BooleanVar(value=True)
-        self.show_url_only_var = tk.BooleanVar(value=False)
+        self.show_url_only_var = tk.BooleanVar(value=True)
+        self.show_local_var = tk.BooleanVar(value=True)  # Local file filter
 
         self.create_widgets()
         self.load_artists() 
@@ -266,13 +267,6 @@ class KpopDBBrowser(tk.Tk):
         style.map("Horizontal.TScrollbar", background=[("active", "#6272a4")])
 
         filter_frame = ttk.Frame(self); filter_frame.pack(fill="x", padx=10, pady=8)
-        # --- New checkboxes for MV/Performance and URL ---
-        self.mv_checkbox = ttk.Checkbutton(filter_frame, text="MV", variable=self.show_mv_var, command=self.update_list)
-        self.mv_checkbox.pack(side="left", padx=(0, 8))
-        self.perf_checkbox = ttk.Checkbutton(filter_frame, text="Performance", variable=self.show_perf_var, command=self.update_list)
-        self.perf_checkbox.pack(side="left", padx=(0, 8))
-        self.url_checkbox = ttk.Checkbutton(filter_frame, text="URL", variable=self.show_url_only_var, command=self.update_list)
-        self.url_checkbox.pack(side="left", padx=(0, 15))
 
         ttk.Label(filter_frame, text="Artist:").pack(side="left")
         self.artist_var = tk.StringVar()
@@ -318,6 +312,18 @@ class KpopDBBrowser(tk.Tk):
         self.listbox.pack(side="left", fill="both", expand=True)
         
         self.listbox.bind("<Double-Button-1>", lambda e: self.play_selected())
+        # --- Media type filters: MV, Performance, URL, Local ---
+        media_filter_frame = ttk.Frame(self)
+        media_filter_frame.pack(fill="x", padx=10, pady=(0,5))
+        # Pack right-to-left so items appear in order: MV, Performance, URL, Local
+        self.local_checkbox = ttk.Checkbutton(media_filter_frame, text="Local", variable=self.show_local_var, command=self.update_list)
+        self.local_checkbox.pack(side="right", padx=(0,8))
+        self.url_checkbox = ttk.Checkbutton(media_filter_frame, text="URL", variable=self.show_url_only_var, command=self.update_list)
+        self.url_checkbox.pack(side="right", padx=(0,8))
+        self.perf_checkbox = ttk.Checkbutton(media_filter_frame, text="Performance", variable=self.show_perf_var, command=self.update_list)
+        self.perf_checkbox.pack(side="right", padx=(0,8))
+        self.mv_checkbox = ttk.Checkbutton(media_filter_frame, text="MV", variable=self.show_mv_var, command=self.update_list)
+        self.mv_checkbox.pack(side="right", padx=(0,8))
 
         # Management frame for Add/Modify Data button
         self.management_frame_for_data_entry = ttk.Frame(self)
@@ -353,15 +359,19 @@ class KpopDBBrowser(tk.Tk):
         status.pack(fill="x", side="bottom")
         self.status_var.set("Ready.")
 
-
     def open_data_entry_window(self):
         if self.data_entry_window_instance and self.data_entry_window_instance.winfo_exists():
             self.data_entry_window_instance.lift()
             self.data_entry_window_instance.focus_set()
             messagebox.showinfo("Window Open", "The Data Entry window is already open.", parent=self)
         else:
-            self.data_entry_window_instance = data_entry_ui.DataEntryWindow(self)
-
+            # Pass the db_operations module to the DataEntryWindow
+            self.data_entry_window_instance = data_entry_ui.DataEntryWindow(
+                self, 
+                db_ops=db_operations # Pass the imported module
+            )
+    
+    
     def open_modify_entry_window(self):
         """Launch the ModifyEntryWindow for a single selected record."""
         sel = self.listbox.curselection()
@@ -388,7 +398,7 @@ class KpopDBBrowser(tk.Tk):
 
     def clear_search(self):
         self.search_var.set(""); self.artist_var.set(""); self.date_var.set(""); self.filter_4k_var.set(False)
-        self.show_mv_var.set(True); self.show_perf_var.set(True); self.show_url_only_var.set(False)
+        self.show_mv_var.set(True); self.show_perf_var.set(True); self.show_url_only_var.set(True); self.show_local_var.set(True)
         self.update_list()
 
     def load_artists(self):
@@ -449,20 +459,26 @@ class KpopDBBrowser(tk.Tk):
         filter_4k = self.filter_4k_var.get()
         show_mv = self.show_mv_var.get()
         show_perf = self.show_perf_var.get()
-        show_url_only = self.show_url_only_var.get()
+        show_url = self.show_url_only_var.get()
+        show_local = self.show_local_var.get()
         self.filtered_performances_data = []
         self.listbox.delete(0, tk.END)
         for perf_data in self.all_performances_data:
             entry_type = perf_data.get("entry_type", "performance")
+            # Filter by MV vs Performance
             if not ((show_mv and entry_type == "mv") or (show_perf and entry_type == "performance")):
                 continue
-            if show_url_only and not perf_data.get("file_url"):
+            # Filter by source: URL vs Local file
+            is_url_item = bool(perf_data.get("file_url"))
+            if not ((show_url and is_url_item) or (show_local and not is_url_item)):
                 continue
             if artist_filter and artist_filter not in perf_data.get("artists_str", "").lower(): continue
             if date_filter and not perf_data.get("performance_date", "").startswith(date_filter): continue
             if filter_4k:
                 res_lower = perf_data.get("resolution", "").lower()
                 if not any(keyword in res_lower for keyword in self.RESOLUTION_HIGH_QUALITY_KEYWORDS): continue
+            if not show_local and perf_data.get("file_url") is None:
+                continue  # Skip items without a URL if show_url_only is checked
             disp_date = perf_data.get("performance_date", "N/A")[:12]
             disp_artists = perf_data.get("artists_str", "N/A")
             disp_perf_title = perf_data.get("db_title", "N/A") 
