@@ -153,6 +153,12 @@ class ModifyEntryWindow(tk.Toplevel):
             self.show_type_choices = []
             self.resolution_choices = []
 
+        # Disable Show Type and Resolution for music video entries
+        entry_type = self.record.get('entry_type', 'performance')
+        if entry_type != 'performance':
+            showtype_combo.config(state='disabled')
+            res_combo.config(state='disabled')
+
     def save_modified_entry(self):
         # Gather values
         entry_type = self.record.get('entry_type', 'performance')
