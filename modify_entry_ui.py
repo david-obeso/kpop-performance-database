@@ -1,10 +1,12 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import subprocess
+import webbrowser
+import datetime
+from tkinter import simpledialog
 
 import db_operations
 import utils
-import subprocess
-import webbrowser
 import config
 
 # UI theme constants
@@ -43,15 +45,52 @@ class ModifyEntryWindow(tk.Toplevel):
         self.date_var = tk.StringVar(value=self.record.get("performance_date", ""))
         ttk.Entry(form_frame, textvariable=self.date_var, width=20).grid(row=1, column=1, sticky="w", pady=2)
 
+        # Load choices for show type and resolution from DB
+        try:
+            conn = db_operations.get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT DISTINCT show_type FROM performances WHERE show_type IS NOT NULL AND TRIM(show_type)!='' ORDER BY show_type;")
+            self.show_type_choices = [row[0] for row in cur.fetchall() if row[0]]
+            cur.execute("SELECT DISTINCT resolution FROM performances WHERE resolution IS NOT NULL AND TRIM(resolution)!='' ORDER BY resolution;")
+            self.resolution_choices = [row[0] for row in cur.fetchall() if row[0]]
+        except Exception:
+            self.show_type_choices = []
+            self.resolution_choices = []
         # Show Type
         ttk.Label(form_frame, text="Show Type:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=2, column=0, sticky="w", pady=2)
         self.show_type_var = tk.StringVar(value=self.record.get("show_type", ""))
-        ttk.Entry(form_frame, textvariable=self.show_type_var, width=30).grid(row=2, column=1, sticky="w", pady=2)
+        showtype_combo = ttk.Combobox(form_frame, textvariable=self.show_type_var,
+            values=(self.show_type_choices + ["<Add new>"] if self.show_type_choices else ["<Add new>"]),
+            state="readonly", width=30)
+        showtype_combo.grid(row=2, column=1, sticky="w", pady=2)
+        def on_showtype_select(event=None):
+            if self.show_type_var.get() == "<Add new>":
+                new_val = simpledialog.askstring("Add Show Type", "Enter new show type:", parent=self)
+                if new_val:
+                    if new_val not in self.show_type_choices:
+                        self.show_type_choices.append(new_val)
+                        self.show_type_choices.sort(key=lambda s: s.lower())
+                    showtype_combo['values'] = self.show_type_choices + ["<Add new>"]
+                    self.show_type_var.set(new_val)
+        showtype_combo.bind("<<ComboboxSelected>>", on_showtype_select)
 
         # Resolution
         ttk.Label(form_frame, text="Resolution:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=3, column=0, sticky="w", pady=2)
         self.resolution_var = tk.StringVar(value=self.record.get("resolution", ""))
-        ttk.Entry(form_frame, textvariable=self.resolution_var, width=20).grid(row=3, column=1, sticky="w", pady=2)
+        res_combo = ttk.Combobox(form_frame, textvariable=self.resolution_var,
+            values=(self.resolution_choices + ["<Add new>"] if self.resolution_choices else ["<Add new>"]),
+            state="readonly", width=20)
+        res_combo.grid(row=3, column=1, sticky="w", pady=2)
+        def on_res_select(event=None):
+            if self.resolution_var.get() == "<Add new>":
+                new_val = simpledialog.askstring("Add Resolution", "Enter new resolution:", parent=self)
+                if new_val:
+                    if new_val not in self.resolution_choices:
+                        self.resolution_choices.append(new_val)
+                        self.resolution_choices.sort(key=lambda s: s.lower())
+                    res_combo['values'] = self.resolution_choices + ["<Add new>"]
+                    self.resolution_var.set(new_val)
+        res_combo.bind("<<ComboboxSelected>>", on_res_select)
 
         # File Path1
         ttk.Label(form_frame, text="File Path1:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=4, column=0, sticky="w", pady=2)
@@ -102,6 +141,18 @@ class ModifyEntryWindow(tk.Toplevel):
         ttk.Button(btn_frame, text="Delete", command=self.delete_entry, style="TButton").pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn_frame, text="Cancel", command=self.cancel, style="TButton").pack(side=tk.RIGHT, padx=5)
 
+        # Load show type and resolution choices from DB
+        try:
+            conn = db_operations.get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT DISTINCT show_type FROM performances WHERE show_type IS NOT NULL AND TRIM(show_type)!='' ORDER BY show_type;")
+            self.show_type_choices = [row[0] for row in cur.fetchall() if row[0]]
+            cur.execute("SELECT DISTINCT resolution FROM performances WHERE resolution IS NOT NULL AND TRIM(resolution)!='' ORDER BY resolution;")
+            self.resolution_choices = [row[0] for row in cur.fetchall() if row[0]]
+        except Exception:
+            self.show_type_choices = []
+            self.resolution_choices = []
+
     def save_modified_entry(self):
         # Gather values
         entry_type = self.record.get('entry_type', 'performance')
@@ -117,6 +168,12 @@ class ModifyEntryWindow(tk.Toplevel):
         if secondary_artist and secondary_artist != primary_artist:
             artists.append(secondary_artist)
         songs = [s.strip() for s in self.songs_var.get().split(',') if s.strip()]
+        # Validate date format YYYY-MM-DD
+        try:
+            datetime.datetime.strptime(date, "%Y-%m-%d")
+        except Exception:
+            messagebox.showerror("Invalid Date", "Date must be in YYYY-MM-DD format.", parent=self)
+            return
         try:
             if entry_type == 'performance':
                 show_type = self.show_type_var.get().strip()
