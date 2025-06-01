@@ -210,3 +210,170 @@ def insert_performance(title, performance_date, show_type, resolution, file_path
                 [(song_id, perf_id) for song_id in song_ids]
             )
     conn.commit()
+
+def update_performance(performance_id, title, performance_date, show_type, resolution,
+                       file_path1=None, file_path2=None, file_url=None, score=None,
+                       artist_names=None, song_titles=None):
+    """
+    Updates an existing performance record and its linked artists and songs.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Update main performance fields
+    cursor.execute(
+        """
+        UPDATE performances
+        SET title = ?, performance_date = ?, show_type = ?, resolution = ?,
+            file_path1 = ?, file_path2 = ?, file_url = ?, score = ?
+        WHERE performance_id = ?
+        """,
+        (title, performance_date, show_type, resolution,
+         file_path1, file_path2, file_url, score, performance_id)
+    )
+    # Refresh artist links
+    cursor.execute("DELETE FROM performance_artist_link WHERE performance_id = ?", (performance_id,))
+    artist_ids = []
+    if artist_names:
+        for idx, artist_name in enumerate(artist_names):
+            cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
+            row = cursor.fetchone()
+            if row:
+                artist_id = row[0]
+                artist_ids.append(artist_id)
+                cursor.execute(
+                    "INSERT INTO performance_artist_link (performance_id, artist_id, artist_order) VALUES (?, ?, ?)",
+                    (performance_id, artist_id, idx+1)
+                )
+    # Refresh song links
+    cursor.execute("DELETE FROM song_performance_link WHERE performance_id = ?", (performance_id,))
+    if song_titles and artist_ids:
+        song_titles_set = tuple(set(song_titles))
+        artist_ids_set = tuple(set(artist_ids))
+        if song_titles_set and artist_ids_set:
+            # Find matching song IDs
+            query = (
+                "SELECT s.song_id FROM songs s "
+                "JOIN song_artist_link sal ON s.song_id = sal.song_id "
+                f"WHERE s.song_title IN ({','.join(['?']*len(song_titles_set))}) "
+                f"AND sal.artist_id IN ({','.join(['?']*len(artist_ids_set))})"
+            )
+            cursor.execute(query, song_titles_set + artist_ids_set)
+            song_ids = [row[0] for row in cursor.fetchall()]
+            cursor.executemany(
+                "INSERT OR IGNORE INTO song_performance_link (song_id, performance_id) VALUES (?, ?)",
+                [(song_id, performance_id) for song_id in song_ids]
+            )
+    conn.commit()
+
+
+def delete_performance(performance_id):
+    """
+    Deletes a performance and its associated links.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM performances WHERE performance_id = ?", (performance_id,))
+    conn.commit()
+
+
+def get_all_performance_ids():
+    """
+    Fetches all performance IDs from the database.
+    """
+    conn = get_db_connection()
+    if not conn:
+        return []
+    query = "SELECT performance_id FROM performances;"
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        performance_ids = [row[0] for row in cursor.fetchall()]
+        return performance_ids
+    except sqlite3.Error as e:
+        print(f"Database error in get_all_performance_ids: {e}")
+        return []
+    except AttributeError as e:
+        print(f"AttributeError in get_all_performance_ids (likely conn is None): {e}")
+        return []
+
+def update_music_video(mv_id, title, release_date,
+                       file_path1=None, file_path2=None, file_url=None, score=None,
+                       artist_names=None, song_titles=None):
+    """
+    Updates an existing music video record and its linked artists and songs.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Update main music video fields
+    cursor.execute(
+        """
+        UPDATE music_videos
+        SET title = ?, release_date = ?, file_path1 = ?, file_path2 = ?, file_url = ?, score = ?
+        WHERE mv_id = ?
+        """,
+        (title, release_date, file_path1, file_path2, file_url, score, mv_id)
+    )
+    # Refresh artist links
+    cursor.execute("DELETE FROM music_video_artist_link WHERE mv_id = ?", (mv_id,))
+    artist_ids = []
+    if artist_names:
+        for idx, artist_name in enumerate(artist_names):
+            cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (artist_name,))
+            row = cursor.fetchone()
+            if row:
+                artist_id = row[0]
+                artist_ids.append(artist_id)
+                cursor.execute(
+                    "INSERT INTO music_video_artist_link (mv_id, artist_id, artist_order) VALUES (?, ?, ?)",
+                    (mv_id, artist_id, idx+1)
+                )
+    # Refresh song links
+    cursor.execute("DELETE FROM song_music_video_link WHERE music_video_id = ?", (mv_id,))
+    if song_titles and artist_ids:
+        song_titles_set = tuple(set(song_titles))
+        artist_ids_set = tuple(set(artist_ids))
+        if song_titles_set and artist_ids_set:
+            query = (
+                "SELECT s.song_id FROM songs s "
+                "JOIN song_artist_link sal ON s.song_id = sal.song_id "
+                f"WHERE s.song_title IN ({','.join(['?']*len(song_titles_set))}) "
+                f"AND sal.artist_id IN ({','.join(['?']*len(artist_ids_set))})"
+            )
+            cursor.execute(query, song_titles_set + artist_ids_set)
+            song_ids = [row[0] for row in cursor.fetchall()]
+            cursor.executemany(
+                "INSERT OR IGNORE INTO song_music_video_link (song_id, music_video_id) VALUES (?, ?)",
+                [(song_id, mv_id) for song_id in song_ids]
+            )
+    conn.commit()
+
+
+def delete_music_video(mv_id):
+    """
+    Deletes a music video and its associated links.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM music_videos WHERE mv_id = ?", (mv_id,))
+    conn.commit()
+
+
+def get_all_music_video_ids():
+    """
+    Fetches all music video IDs from the database.
+    """
+    conn = get_db_connection()
+    if not conn:
+        return []
+    query = "SELECT mv_id FROM music_videos;"
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        music_video_ids = [row[0] for row in cursor.fetchall()]
+        return music_video_ids
+    except sqlite3.Error as e:
+        print(f"Database error in get_all_music_video_ids: {e}")
+        return []
+    except AttributeError as e:
+        print(f"AttributeError in get_all_music_video_ids (likely conn is None): {e}")
+        return []

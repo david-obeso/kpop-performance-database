@@ -16,6 +16,7 @@ import config
 import utils
 import db_operations
 import data_entry_ui # For the new data entry window
+import modify_entry_ui  # For the modify-entry window
 
 # Constants
 DARK_BG = "#222222"
@@ -229,6 +230,7 @@ class KpopDBBrowser(tk.Tk):
         self.change_score_var = tk.BooleanVar(value=False)
         self.score_editor_window = None
         self.data_entry_window_instance = None # For the new data entry window
+        self.modify_window = None  # For the modify-entry window
 
         # --- New variables for filtering ---
         self.show_mv_var = tk.BooleanVar(value=True)
@@ -361,15 +363,20 @@ class KpopDBBrowser(tk.Tk):
             self.data_entry_window_instance = data_entry_ui.DataEntryWindow(self)
 
     def open_modify_entry_window(self):
-        """Stub for modifying an existing record. Requires exactly one selection."""
+        """Launch the ModifyEntryWindow for a single selected record."""
         sel = self.listbox.curselection()
         if len(sel) != 1:
-            messagebox.showwarning("Selection", "Please, select a single record", parent=self)
+            messagebox.showwarning("Selection", "Please select exactly one record to modify.", parent=self)
             return
         idx = int(sel[0])
         record = self.filtered_performances_data[idx]
-        print(f"Modify requested for: {record}")
-        # TODO: launch ModifyEntryWindow here once implemented
+        # If a modify window is already open, bring it to front
+        if hasattr(self, 'modify_window') and self.modify_window and self.modify_window.winfo_exists():
+            self.modify_window.lift()
+            self.modify_window.focus_set()
+            return
+        # Open modify window, refresh performances on save/delete
+        self.modify_window = modify_entry_ui.ModifyEntryWindow(self, record, self.load_performances)
 
     def disable_play_buttons(self):
         if self.play_button: self.play_button.config(state=tk.DISABLED)
