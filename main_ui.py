@@ -313,11 +313,11 @@ class KpopDBBrowser(tk.Tk):
         # Define column widths and names
         self.column_info = [
             {"name": "Date", "width": 12, "key": "performance_date"},
-            {"name": "Artist(s)", "width": 30, "key": "artists_str"},
-            {"name": "Performance Title", "width": 85, "key": "db_title"},
+            {"name": "Artist(s)", "width": 32, "key": "artists_str"},
+            {"name": "Title", "width": 86, "key": "db_title"},
             {"name": "Show Type", "width": 20, "key": "show_type"},
-            {"name": "Res", "width": 8, "key": "resolution"},
-            {"name": "Score", "width": 5, "key": "score"},
+            {"name": "Res", "width": 9, "key": "resolution"},
+            {"name": "Score", "width": 6, "key": "score"},
             {"name": "Source", "width": 10, "key": "source"}
         ]
         
