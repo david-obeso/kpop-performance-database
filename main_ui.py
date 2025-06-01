@@ -223,6 +223,10 @@ class KpopDBBrowser(tk.Tk):
         self.filtered_performances_data = [] 
         self.artists_list = [] 
         
+        # Initialize sorting variables
+        self.sort_column = None
+        self.sort_ascending = True
+        
         self.RESOLUTION_HIGH_QUALITY_KEYWORDS = ["4k", "upscaled", "ai"]
         self.status_var = tk.StringVar(value="Initializing...")
         self.play_button = None; self.play_random_button = None
@@ -275,36 +279,83 @@ class KpopDBBrowser(tk.Tk):
                                            state="readonly", style="Custom.TCombobox",
                                            width=40)
         self.artist_dropdown.pack(side="left", padx=5, ipadx=5, ipady=6)
-        self.artist_dropdown.bind("<<ComboboxSelected>>", lambda e: self.update_list())
+        self.artist_dropdown.bind("<<ComboboxSelected>>", lambda e: self.update_list(apply_current_sort=True))
         # Enable keyboard navigation: jump to artist starting with typed letter
         self.artist_dropdown.bind("<KeyPress>", self.handle_artist_combo_keypress)
         
         ttk.Label(filter_frame, text="Date (YYYY or YYYY-MM):").pack(side="left", padx=(15,0))
         self.date_var = tk.StringVar()
         date_entry = tk.Entry(filter_frame, textvariable=self.date_var, width=10, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, insertbackground=BRIGHT_FG)
-        date_entry.pack(side="left", padx=5, ipadx=5, ipady=3); date_entry.bind("<KeyRelease>", lambda e: self.update_list())
+        date_entry.pack(side="left", padx=5, ipadx=5, ipady=3); date_entry.bind("<KeyRelease>", lambda e: self.update_list(apply_current_sort=True))
         
         # 4K filter: checkbox with label on the right
         self.filter_4k_var = tk.BooleanVar(value=False)
         filter_4k_checkbutton = ttk.Checkbutton(filter_frame, variable=self.filter_4k_var,
-                                               text="4K", command=self.update_list)
+                                               text="4K", command=lambda: self.update_list(apply_current_sort=True))
         filter_4k_checkbutton.pack(side="left", padx=(15, 10))
 
         # New records only (score 0 or None)
-        self.new_checkbox = ttk.Checkbutton(filter_frame, text="New", variable=self.show_new_var, command=self.update_list)
+        self.new_checkbox = ttk.Checkbutton(filter_frame, text="New", variable=self.show_new_var, 
+                                           command=lambda: self.update_list(apply_current_sort=True))
         self.new_checkbox.pack(side="left", padx=(2, 10))
         
         ttk.Label(filter_frame, text="Search:").pack(side="left", padx=(10,0))
         self.search_var = tk.StringVar()
         search_entry = tk.Entry(filter_frame, textvariable=self.search_var, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, insertbackground=BRIGHT_FG)
-        search_entry.pack(side="left", fill="x", expand=True, padx=5, ipadx=5, ipady=3); search_entry.bind("<KeyRelease>", lambda e: self.update_list())
+        search_entry.pack(side="left", fill="x", expand=True, padx=5, ipadx=5, ipady=3); search_entry.bind("<KeyRelease>", lambda e: self.update_list(apply_current_sort=True))
         
         ttk.Button(filter_frame, text="Clear", command=self.clear_search).pack(side="left", padx=5, ipadx=8, ipady=3)
 
-        header_text = (f"{'Date':<12} | {'Artist(s)':<30} | {'Performance Title':<85} | {'Show Type':<20} | "
-                       f"{'Res':<8} | {'Score':<5} | {'Source'}")
-        header = tk.Label(self, text=header_text, font=FONT_HEADER, anchor="w", bg=DARK_BG, fg=BRIGHT_FG)
-        header.pack(fill="x", padx=10, pady=(5,0))
+        # Create clickable header frame
+        header_frame = tk.Frame(self, bg=DARK_BG)
+        header_frame.pack(fill="x", padx=10, pady=(5,0))
+        
+        # Define column widths and names
+        self.column_info = [
+            {"name": "Date", "width": 12, "key": "performance_date"},
+            {"name": "Artist(s)", "width": 30, "key": "artists_str"},
+            {"name": "Performance Title", "width": 85, "key": "db_title"},
+            {"name": "Show Type", "width": 20, "key": "show_type"},
+            {"name": "Res", "width": 8, "key": "resolution"},
+            {"name": "Score", "width": 5, "key": "score"},
+            {"name": "Source", "width": 10, "key": "source"}
+        ]
+        
+        # Create column header labels and track sort state
+        self.sort_column = None
+        self.sort_ascending = True
+        
+        # Create clickable headers
+        self.header_labels = []  # Keep track of header labels for easier access
+        for i, col in enumerate(self.column_info):
+            # Create label with underline to indicate it's clickable
+            header_label = tk.Label(
+                header_frame, 
+                text=f"{col['name']:<{col['width']}}", 
+                font=FONT_HEADER, 
+                anchor="w", 
+                bg=DARK_BG, 
+                fg=BRIGHT_FG,
+                cursor="hand2",  # Hand cursor to indicate clickable
+                padx=2,
+                relief="flat"  # Will be changed to "raised" when sorted
+            )
+            header_label.pack(side="left", padx=(0 if i == 0 else 1, 0))
+            
+            # Store reference to label
+            self.header_labels.append(header_label)
+            
+            # Add separator between columns
+            if i < len(self.column_info) - 1:
+                separator = tk.Label(header_frame, text="|", font=FONT_HEADER, bg=DARK_BG, fg=BRIGHT_FG)
+                separator.pack(side="left", padx=1)
+                
+            # Bind events
+            header_label.bind("<Button-1>", lambda e, col_key=col["key"]: self.sort_list_by(col_key))
+            
+            # Add hover effect to indicate interactivity
+            header_label.bind("<Enter>", lambda e, label=header_label: self._set_header_hover(label, True))
+            header_label.bind("<Leave>", lambda e, label=header_label: self._set_header_hover(label, False))
 
         listbox_frame = tk.Frame(self, bg=DARK_BG); listbox_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -326,13 +377,17 @@ class KpopDBBrowser(tk.Tk):
         media_filter_frame = ttk.Frame(self)
         media_filter_frame.pack(fill="x", padx=10, pady=(0,5))
         # Pack right-to-left so items appear in order: MV, Performance, URL, Local
-        self.local_checkbox = ttk.Checkbutton(media_filter_frame, text="Local", variable=self.show_local_var, command=self.update_list)
+        self.local_checkbox = ttk.Checkbutton(media_filter_frame, text="Local", variable=self.show_local_var, 
+                                         command=lambda: self.update_list(apply_current_sort=True))
         self.local_checkbox.pack(side="right", padx=(0,8))
-        self.url_checkbox = ttk.Checkbutton(media_filter_frame, text="URL", variable=self.show_url_only_var, command=self.update_list)
+        self.url_checkbox = ttk.Checkbutton(media_filter_frame, text="URL", variable=self.show_url_only_var, 
+                                           command=lambda: self.update_list(apply_current_sort=True))
         self.url_checkbox.pack(side="right", padx=(0,8))
-        self.perf_checkbox = ttk.Checkbutton(media_filter_frame, text="Performance", variable=self.show_perf_var, command=self.update_list)
+        self.perf_checkbox = ttk.Checkbutton(media_filter_frame, text="Performance", variable=self.show_perf_var, 
+                                            command=lambda: self.update_list(apply_current_sort=True))
         self.perf_checkbox.pack(side="right", padx=(0,8))
-        self.mv_checkbox = ttk.Checkbutton(media_filter_frame, text="MV", variable=self.show_mv_var, command=self.update_list)
+        self.mv_checkbox = ttk.Checkbutton(media_filter_frame, text="MV", variable=self.show_mv_var, 
+                                          command=lambda: self.update_list(apply_current_sort=True))
         self.mv_checkbox.pack(side="right", padx=(0,8))
 
         # Management frame for Add/Modify Data button
@@ -409,7 +464,7 @@ class KpopDBBrowser(tk.Tk):
     def clear_search(self):
         self.search_var.set(""); self.artist_var.set(""); self.date_var.set(""); self.filter_4k_var.set(False)
         self.show_mv_var.set(True); self.show_perf_var.set(True); self.show_url_only_var.set(True); self.show_local_var.set(True); self.show_new_var.set(False)
-        self.update_list()
+        self.update_list(apply_current_sort=True)
 
     # New keyboard navigation handler for artist combobox
     def handle_artist_combo_keypress(self, event):
@@ -428,7 +483,7 @@ class KpopDBBrowser(tk.Tk):
             for i in list(range(start, len(values))) + list(range(0, start)):
                 if values[i].lower().startswith(typed):
                     self.artist_var.set(values[i])
-                    self.update_list()
+                    self.update_list(apply_current_sort=True)
                     return
 
     def load_artists(self):
@@ -481,10 +536,26 @@ class KpopDBBrowser(tk.Tk):
             path, is_yt = utils.get_playable_path_info(mv_dict)
             mv_dict["playable_path"] = path; mv_dict["is_youtube"] = is_yt
             self.all_performances_data.append(mv_dict)
-        self.update_list()
+        self.update_list(apply_current_sort=True)
         self.pre_wake_external_drives()
 
-    def update_list(self):
+    def sort_list_by(self, column_key):
+        """Sort the performance list by the specified column"""
+        # If clicking the same column, toggle sort order
+        if self.sort_column == column_key:
+            self.sort_ascending = not self.sort_ascending
+        else:
+            # New column, reset to ascending
+            self.sort_column = column_key
+            self.sort_ascending = True
+            
+        # Update headers to show sort indicator
+        self._update_sort_indicators()
+        
+        # Refresh the list with sorting applied
+        self.update_list(apply_current_sort=True)
+            
+    def update_list(self, apply_current_sort=False):
         artist_filter = self.artist_var.get().lower()
         date_filter = self.date_var.get()
         search_term = self.search_var.get().lower()
@@ -516,11 +587,30 @@ class KpopDBBrowser(tk.Tk):
                 if score_val is not None and score_val != 0: continue
             if not show_local and perf_data.get("file_url") is None:
                 continue  # Skip items without a URL if show_url_only is checked
+
+            if search_term:
+                searchable_content = " ".join(filter(None, [
+                    perf_data.get("performance_date"), perf_data.get("artists_str"),
+                    perf_data.get("db_title"), perf_data.get("show_type"),
+                    perf_data.get("resolution"), str(perf_data.get("score", "")),
+                    perf_data.get("playable_path")
+                ])).lower()
+                if search_term not in searchable_content: continue
+            
+            self.filtered_performances_data.append(perf_data)
+        
+        # Apply sorting if needed
+        if apply_current_sort and self.sort_column:
+            self.apply_sorting()
+        
+        # Populate the listbox with possibly sorted data
+        for perf_data in self.filtered_performances_data:
+            # Format the display string
             disp_date = perf_data.get("performance_date", "N/A")[:12]
             disp_artists = perf_data.get("artists_str", "N/A")
             disp_perf_title = perf_data.get("db_title", "N/A") 
             # For MVs, leave show_type and resolution blank
-            if entry_type == "mv":
+            if perf_data.get("entry_type") == "mv":
                 disp_show_type = ""
                 disp_res = ""
             else:
@@ -535,18 +625,8 @@ class KpopDBBrowser(tk.Tk):
                 else: source_text = "Local File"
             
             display_string = (f"{disp_date:<12} | {disp_artists:<30.30} | {disp_perf_title:<85.85} | "
-                              f"{disp_show_type:<20.20} | {disp_res:<8.8} | {disp_score:<5} | {source_text}")
-
-            if search_term:
-                searchable_content = " ".join(filter(None, [
-                    perf_data.get("performance_date"), perf_data.get("artists_str"),
-                    perf_data.get("db_title"), perf_data.get("show_type"),
-                    perf_data.get("resolution"), str(perf_data.get("score", "")),
-                    perf_data.get("playable_path")
-                ])).lower()
-                if search_term not in searchable_content: continue
+                            f"{disp_show_type:<20.20} | {disp_res:<8.8} | {disp_score:<5} | {source_text}")
             
-            self.filtered_performances_data.append(perf_data)
             self.listbox.insert(tk.END, display_string)
             
         self.status_var.set(f"{len(self.filtered_performances_data)} records match your filters.")
@@ -793,6 +873,82 @@ class KpopDBBrowser(tk.Tk):
         self.load_performances()
         self.status_var.set("Data refreshed. Scores may have been updated."); self.enable_play_buttons()
 
+    def _set_header_hover(self, label, is_hovering):
+        """Change header appearance on hover"""
+        # Don't change appearance if this is the sorted column
+        col_index = self.header_labels.index(label) if label in self.header_labels else -1
+        if col_index >= 0 and self.column_info[col_index]["key"] == self.sort_column:
+            return
+            
+        if is_hovering:
+            label.config(bg="#334455")  # Slightly lighter background on hover
+        else:
+            label.config(bg=DARK_BG)    # Reset to default background
+    
+    def _update_sort_indicators(self):
+        """Update all header labels to reflect current sort state"""
+        if not hasattr(self, 'header_labels'):
+            return
+            
+        for i, label in enumerate(self.header_labels):
+            if i < len(self.column_info):
+                col = self.column_info[i]
+                is_sorted = (col["key"] == self.sort_column)
+                
+                if is_sorted:
+                    # Add sort indicator to sorted column
+                    indicator = "▲" if self.sort_ascending else "▼"
+                    label.config(
+                        text=f"{col['name']} {indicator:<{col['width'] - len(col['name']) - 1}}",
+                        bg="#2a3344",  # Highlight background for sorted column
+                        relief="raised"  # Give it a raised appearance
+                    )
+                else:
+                    # Reset other columns
+                    label.config(
+                        text=f"{col['name']:<{col['width']}}",
+                        bg=DARK_BG,
+                        relief="flat"
+                    )
+    
+    def apply_sorting(self):
+        """Sort the filtered_performances_data based on current sort column and direction"""
+        if not self.sort_column:
+            return
+        
+        def get_sort_key(item):
+            if self.sort_column == "score":
+                # Score requires special handling as it might be None or numeric
+                val = item.get(self.sort_column)
+                if val is None:
+                    return -1 if self.sort_ascending else float('inf')
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return -1 if self.sort_ascending else float('inf')
+            elif self.sort_column == "source":
+                # Source isn't directly in the data, need to derive it
+                if item.get("is_youtube"):
+                    return "YouTube"
+                elif item.get("file_url"):
+                    return "Web URL"
+                elif item.get("playable_path"):
+                    return "Local File"
+                else:
+                    return "N/A"
+            else:
+                # Default string-based comparison, with None/empty handling
+                val = item.get(self.sort_column, "")
+                if val is None:
+                    val = ""
+                return str(val).lower()  # Case-insensitive sorting
+        
+        # Apply the sort
+        self.filtered_performances_data.sort(
+            key=get_sort_key,
+            reverse=not self.sort_ascending
+        )
+    
     def pre_wake_external_drives(self):
         if not self.all_performances_data: return
         
