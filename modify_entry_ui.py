@@ -254,21 +254,32 @@ class ModifyEntryWindow(tk.Toplevel):
         for t in titles:
             listbox.insert(tk.END, t)
         # Pre-select current songs
-        current = [s.strip() for s in self.songs_var.get().split(',') if s.strip()]
+        old_songs = [s.strip() for s in self.songs_var.get().split(',') if s.strip()]
+        if old_songs:
+            if messagebox.askyesno("Delete Previous Songs", "Previous songs exist. Do you want to delete them?", parent=self):
+                old_songs = []
+                self.songs_var.set("")
         for idx, t in enumerate(titles):
-            if t in current:
+            if t in old_songs:
                 listbox.selection_set(idx)
         def on_ok():
             selected = [titles[i] for i in listbox.curselection()]
-            self.songs_var.set(', '.join(selected))
+            new_songs = selected
+            new_songs_str = ', '.join(new_songs)
+            self.songs_var.set(new_songs_str)
+            # If songs changed, update title and warn on top of popup
+            if set(old_songs) != set(new_songs):
+                self.title_var.set(new_songs_str)
+                messagebox.showwarning(
+                    "Title Updated",
+                    f"Title has been set to the selected songs: {new_songs_str}. Please modify manually if needed.",
+                    parent=popup
+                )
             popup.destroy()
         btn_frame = ttk.Frame(popup, padding=10)
         btn_frame.pack(fill=tk.X)
         ttk.Button(btn_frame, text="OK", command=on_ok, style="TButton").pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn_frame, text="Cancel", command=popup.destroy, style="TButton").pack(side=tk.RIGHT, padx=5)
-
-        # Initialize song list
-        self.update_song_list()
 
     def update_song_list(self, filtered_songs=None):
         """Update the listbox with the song names."""
