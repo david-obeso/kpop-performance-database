@@ -44,8 +44,10 @@ class DataEntryWindow(tk.Toplevel):
         style.theme_use("clam")
         style.configure("DataEntry.TFrame", background=DARK_BG)
         style.configure("DataEntry.TLabel", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN)
+        style.configure("DataEntry.TLabelframe.Label", background=DARK_BG, foreground=BRIGHT_FG, font=("Courier New", 15, "bold"))
+        style.configure("DataEntry.TLabelframe", background=DARK_BG)
         style.configure("DataEntry.TRadiobutton", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN,
-                        indicatorrelief=tk.FLAT, indicatormargin=-1, indicatordiameter=15)
+                        indicatorrelief=tk.FLAT, indicatormargin=5, indicatordiameter=15, indicatorpadding=8)
         style.map("DataEntry.TRadiobutton",
                   indicatorcolor=[('selected', ACCENT), ('!selected', '#555555')],
                   background=[('active', DARK_BG)])
@@ -77,8 +79,8 @@ class DataEntryWindow(tk.Toplevel):
         main_frame = ttk.Frame(self, padding="20", style="DataEntry.TFrame")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.entry_type_var = tk.StringVar(value="performance")
-        self.source_type_var = tk.StringVar(value="url")
+        self.entry_type_var = tk.StringVar(value="performance")  # default performance
+        self.source_type_var = tk.StringVar(value="local_file")  # default local file
         self.title_var = tk.StringVar()
 
         # Remove default date assignment so the date field starts empty
@@ -87,21 +89,22 @@ class DataEntryWindow(tk.Toplevel):
         selection_outer_frame = ttk.Frame(main_frame, style="DataEntry.TFrame")
         selection_outer_frame.pack(pady=0, fill="x")
 
-        type_frame = ttk.LabelFrame(selection_outer_frame, text="1. Select Entry Type", style="DataEntry.TFrame", padding=(10, 5))
+        type_frame = ttk.LabelFrame(selection_outer_frame, text="Entry Type", style="DataEntry.TLabelframe", padding=(10, 8))
         type_frame.pack(pady=5, fill="x")
         ttk.Radiobutton(type_frame, text="Performance", variable=self.entry_type_var,
-                        value="performance", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=10, pady=5)
+                        value="performance", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=20, pady=10)
         ttk.Radiobutton(type_frame, text="Music Video", variable=self.entry_type_var,
-                        value="music_video", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=10, pady=5)
+                        value="music_video", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=20, pady=10)
 
-        source_frame = ttk.LabelFrame(selection_outer_frame, text="2. Select Source Type", style="DataEntry.TFrame", padding=(10, 5))
+        source_frame = ttk.LabelFrame(selection_outer_frame, text="Source Type", style="DataEntry.TLabelframe", padding=(10, 8))
         source_frame.pack(pady=5, fill="x")
-        ttk.Radiobutton(source_frame, text="Enter New URL", variable=self.source_type_var,
-                        value="url", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=10, pady=5)
-        ttk.Radiobutton(source_frame, text="Process Local File(s)", variable=self.source_type_var,
-                        value="local_file", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=10, pady=5)
+        ttk.Radiobutton(source_frame, text="URL", variable=self.source_type_var,
+                        value="url", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=20, pady=10)
+        ttk.Radiobutton(source_frame, text="Local File", variable=self.source_type_var,
+                        value="local_file", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=20, pady=10)
         
-        self.content_area_frame = ttk.LabelFrame(main_frame, text="3. Enter Details", style="DataEntry.TFrame", padding=(10,10))
+        # details area without framing label
+        self.content_area_frame = ttk.Frame(main_frame, style="DataEntry.TFrame")
         self.content_area_frame.pack(pady=10, fill=tk.BOTH, expand=True)
         
         self.current_content_placeholder_label = ttk.Label(self.content_area_frame, text="Select options above and click 'Proceed / Next Step'.", style="DataEntry.TLabel")
