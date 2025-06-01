@@ -15,7 +15,7 @@ except ImportError:
 
 # Modularized imports (will be needed later if not already passed, e.g. config)
 # import config
-# import utils
+import utils  # For extract_date_from_filepath
 # db_operations will be passed in constructor
 
 # Constants
@@ -32,7 +32,7 @@ class DataEntryWindow(tk.Toplevel):
     def __init__(self, master, db_ops): 
         super().__init__(master)
         self.title("Add Database Entry")  # Simplify window title
-        self.geometry("900x1100")  # Increased height
+        self.geometry("900x1050")  # Increased height
         self.configure(bg=DARK_BG)
         self.transient(master)
         self.grab_set()
@@ -759,8 +759,22 @@ class DataEntryWindow(tk.Toplevel):
                     sf.write(os.path.dirname(filename))
             except Exception:
                 pass
+                
             self.selected_local_files = [filename]
             self.local_files_display_var.set(f"Selected: {filename}")
+            
+            # Try to extract date from filename and prefill the date box
+            date_from_filename = utils.extract_date_from_filepath(filename)
+            if date_from_filename:
+                self.date_var.set(date_from_filename)
+            
+            # Try to find artist name in the filename and prefill the primary artist field
+            if self.all_artists_list:
+                artist_names = [artist['name'] for artist in self.all_artists_list]
+                found_artists = utils.find_string_in_filename(filename, artist_names)
+                if len(found_artists) == 1:
+                    self.primary_artist_var.set(found_artists[0])
+                
             # Enable play button when a file is selected
             if hasattr(self, 'play_button'):
                 self.play_button.config(state=tk.NORMAL)
