@@ -237,6 +237,7 @@ class KpopDBBrowser(tk.Tk):
         self.show_perf_var = tk.BooleanVar(value=True)
         self.show_url_only_var = tk.BooleanVar(value=True)
         self.show_local_var = tk.BooleanVar(value=True)  # Local file filter
+        self.show_new_var = tk.BooleanVar(value=False)   # New record filter (score 0 or None)
 
         self.create_widgets()
         self.load_artists() 
@@ -283,6 +284,9 @@ class KpopDBBrowser(tk.Tk):
         self.filter_4k_var = tk.BooleanVar(value=False)
         filter_4k_checkbutton = ttk.Checkbutton(filter_frame, variable=self.filter_4k_var, command=self.update_list)
         filter_4k_checkbutton.pack(side="left", padx=(2, 10))
+        # New records only (score 0 or None)
+        self.new_checkbox = ttk.Checkbutton(filter_frame, text="New", variable=self.show_new_var, command=self.update_list)
+        self.new_checkbox.pack(side="left", padx=(2, 10))
         
         ttk.Label(filter_frame, text="Search:").pack(side="left", padx=(10,0))
         self.search_var = tk.StringVar()
@@ -398,7 +402,7 @@ class KpopDBBrowser(tk.Tk):
 
     def clear_search(self):
         self.search_var.set(""); self.artist_var.set(""); self.date_var.set(""); self.filter_4k_var.set(False)
-        self.show_mv_var.set(True); self.show_perf_var.set(True); self.show_url_only_var.set(True); self.show_local_var.set(True)
+        self.show_mv_var.set(True); self.show_perf_var.set(True); self.show_url_only_var.set(True); self.show_local_var.set(True); self.show_new_var.set(False)
         self.update_list()
 
     def load_artists(self):
@@ -461,6 +465,7 @@ class KpopDBBrowser(tk.Tk):
         show_perf = self.show_perf_var.get()
         show_url = self.show_url_only_var.get()
         show_local = self.show_local_var.get()
+        show_new = self.show_new_var.get()
         self.filtered_performances_data = []
         self.listbox.delete(0, tk.END)
         for perf_data in self.all_performances_data:
@@ -477,6 +482,10 @@ class KpopDBBrowser(tk.Tk):
             if filter_4k:
                 res_lower = perf_data.get("resolution", "").lower()
                 if not any(keyword in res_lower for keyword in self.RESOLUTION_HIGH_QUALITY_KEYWORDS): continue
+            # Filter new records (score 0 or None)
+            if show_new:
+                score_val = perf_data.get("score")
+                if score_val is not None and score_val != 0: continue
             if not show_local and perf_data.get("file_url") is None:
                 continue  # Skip items without a URL if show_url_only is checked
             disp_date = perf_data.get("performance_date", "N/A")[:12]
@@ -512,7 +521,7 @@ class KpopDBBrowser(tk.Tk):
             self.filtered_performances_data.append(perf_data)
             self.listbox.insert(tk.END, display_string)
             
-        self.status_var.set(f"{len(self.filtered_performances_data)} performances match your filters.")
+        self.status_var.set(f"{len(self.filtered_performances_data)} records match your filters.")
 
     def play_selected(self):
         if self.play_button and self.play_button.cget('state') == tk.DISABLED:
