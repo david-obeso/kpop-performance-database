@@ -698,15 +698,24 @@ class DataEntryWindow(tk.Toplevel):
                                                score=0, artist_names=artist_names,
                                                song_titles=song_titles)
                 messagebox.showinfo("Saved", f"Performance '{self.title_var.get().strip()}' saved successfully.", parent=self)
+                # Refresh main window list
+                self.master_app.load_performances()
+                self.master_app.update_list()
+                # Close window after successful save
+                self.close_window()
+                return
             else:
                 self.db_ops.insert_music_video(title=self.title_var.get().strip(), release_date=perf_date,
                                                file_path1=self.selected_local_files[0], file_url=None,
                                                score=0, artist_names=artist_names,
                                                song_titles=song_titles)
                 messagebox.showinfo("Saved", f"Music Video '{self.title_var.get().strip()}' saved successfully.", parent=self)
-            # Close window after successful save
-            self.close_window()
-            return
+                # Refresh main window list
+                self.master_app.load_performances()
+                self.master_app.update_list()
+                # Close window after successful save
+                self.close_window()
+                return
 
         # If validation fails, the message is already set by _validate_local_file_data
 
@@ -798,31 +807,40 @@ class DataEntryWindow(tk.Toplevel):
                 messagebox.showerror("Duplicate Entry", msg, parent=self)
                 return
 
-            data_to_save = {
-                "Entry Type": entry_type,
-                "Primary Artist": primary_artist,
-                "Secondary Artist": secondary_artist,
-                "Song Titles": song_titles,
-                "Title": title,
-                "Date (YYMMDD)": date_yyyymmdd,
-                "File Path": file_path1,
-            }
-
+            # Prepare data and insert into DB for local file entries
+            raw_date = date_yyyymmdd
+            formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
+            perf_date = formatted_date if formatted_date else raw_date
+            # Build artist names list
+            artist_names = [primary_artist] + ([secondary_artist] if secondary_artist else [])
+            # Insert record based on entry type
             if entry_type == "performance":
-                data_to_save["Show Type"] = self.show_type_var.get().strip()
-                data_to_save["Resolution"] = self.resolution_var.get().strip()
-            
-            # --- Placeholder: Show data that would be saved ---
-            info_message = "The following data would be saved for a local file entry:\n\n"
-            for key, value in data_to_save.items():
-                info_message += f"- {key}: {value}\n"
-            
-            messagebox.showinfo("Local File Save (Placeholder)", info_message, parent=self)
-            
-            # Future: Call actual db_ops.add_performance or db_ops.add_music_video with file_path1
-
-            # After successful save, you might want to reset fields or close the window
-            # self.reset_form_fields() or self.close_window()
+                show_type = self.show_type_var.get().strip()
+                resolution = self.resolution_var.get().strip()
+                self.db_ops.insert_performance(title=title, performance_date=perf_date,
+                                               show_type=show_type, resolution=resolution,
+                                               file_path1=file_path1, file_url=None,
+                                               score=0, artist_names=artist_names,
+                                               song_titles=song_titles)
+                messagebox.showinfo("Saved", f"Performance '{title}' saved successfully.", parent=self)
+                # Refresh main window list
+                self.master_app.load_performances()
+                self.master_app.update_list()
+                # Close window after successful save
+                self.close_window()
+                return
+            else:
+                self.db_ops.insert_music_video(title=title, release_date=perf_date,
+                                               file_path1=file_path1, file_url=None,
+                                               score=0, artist_names=artist_names,
+                                               song_titles=song_titles)
+                messagebox.showinfo("Saved", f"Music Video '{title}' saved successfully.", parent=self)
+                # Refresh main window list
+                self.master_app.load_performances()
+                self.master_app.update_list()
+                # Close window after successful save
+                self.close_window()
+                return
 
         else:
             messagebox.showerror("Error", f"Unknown source type: {source_type}", parent=self)
@@ -1229,15 +1247,24 @@ class DataEntryWindow(tk.Toplevel):
                                                score=0, artist_names=artist_names,
                                                song_titles=song_titles)
                 messagebox.showinfo("Saved", f"Performance '{title}' saved successfully.", parent=self)
+                # Refresh main window list
+                self.master_app.load_performances()
+                self.master_app.update_list()
+                # Close window after successful save
+                self.close_window()
+                return
             else:
                 self.db_ops.insert_music_video(title=title, release_date=perf_date,
                                                file_path1=file_path1, file_url=None,
                                                score=0, artist_names=artist_names,
                                                song_titles=song_titles)
                 messagebox.showinfo("Saved", f"Music Video '{title}' saved successfully.", parent=self)
-            # Close window after successful save
-            self.close_window()
-            return
+                # Refresh main window list
+                self.master_app.load_performances()
+                self.master_app.update_list()
+                # Close window after successful save
+                self.close_window()
+                return
 
         else:
             messagebox.showerror("Error", f"Unknown source type: {source_type}", parent=self)

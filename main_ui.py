@@ -323,6 +323,8 @@ class KpopDBBrowser(tk.Tk):
 
         add_data_button = ttk.Button(self.management_frame_for_data_entry, text="Add", command=self.open_data_entry_window)
         add_data_button.pack(side=tk.LEFT, padx=5, ipadx=10, ipady=3)
+        change_data_button = ttk.Button(self.management_frame_for_data_entry, text="Change", command=self.open_modify_entry_window)
+        change_data_button.pack(side=tk.LEFT, padx=5, ipadx=10, ipady=3)
 
         # Play controls frame
         play_controls_frame = ttk.Frame(self); play_controls_frame.pack(pady=10)
@@ -357,6 +359,17 @@ class KpopDBBrowser(tk.Tk):
             messagebox.showinfo("Window Open", "The Data Entry window is already open.", parent=self)
         else:
             self.data_entry_window_instance = data_entry_ui.DataEntryWindow(self)
+
+    def open_modify_entry_window(self):
+        """Stub for modifying an existing record. Requires exactly one selection."""
+        sel = self.listbox.curselection()
+        if len(sel) != 1:
+            messagebox.showwarning("Selection", "Please, select a single record", parent=self)
+            return
+        idx = int(sel[0])
+        record = self.filtered_performances_data[idx]
+        print(f"Modify requested for: {record}")
+        # TODO: launch ModifyEntryWindow here once implemented
 
     def disable_play_buttons(self):
         if self.play_button: self.play_button.config(state=tk.DISABLED)
