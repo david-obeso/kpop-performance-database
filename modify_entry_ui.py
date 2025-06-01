@@ -91,6 +91,7 @@ class ModifyEntryWindow(tk.Toplevel):
         ttk.Label(form_frame, text="Songs (comma-separated):", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=10, column=0, sticky="w", pady=2)
         self.songs_var = tk.StringVar(value=self.record.get("songs_str", ""))
         ttk.Entry(form_frame, textvariable=self.songs_var, width=60).grid(row=10, column=1, sticky="w", pady=2)
+        ttk.Button(form_frame, text="Select Song(s)", command=self.show_song_selection_popup).grid(row=10, column=2, sticky="w", padx=5)
 
         # Buttons
         btn_frame = ttk.Frame(self, style="TFrame")
@@ -202,6 +203,102 @@ class ModifyEntryWindow(tk.Toplevel):
         """Update the secondary artist field."""
         self.secondary_artist_var.set(artist_name)
 
+    def get_songs_for_selected_artists(self):
+        # Reuse DataEntryWindow logic for fetching songs
+        artists = [self.primary_artist_var.get()]
+        if self.secondary_artist_var.get().strip():
+            artists.append(self.secondary_artist_var.get())
+        # Fetch all songs linked to these artists, mimic DataEntryWindow
+        conn = db_operations.get_db_connection()
+        song_rows = []
+        if artists:
+            placeholders = ",".join("?" for _ in artists)
+            # artist_ids
+            artist_ids = []
+            for name in artists:
+                cursor = conn.cursor()
+                cursor.execute("SELECT artist_id FROM artists WHERE artist_name = ?", (name,))
+                row = cursor.fetchone()
+                if row:
+                    artist_ids.append(row[0])
+            if artist_ids:
+                ph_art = ",".join("?" for _ in artist_ids)
+                query = f"SELECT DISTINCT s.song_id, s.song_title FROM songs s JOIN song_artist_link sal ON s.song_id=sal.song_id WHERE sal.artist_id IN ({ph_art}) ORDER BY s.song_title COLLATE NOCASE"
+                cursor.execute(query, artist_ids)
+                song_rows = cursor.fetchall()
+        return song_rows
+
+    def show_song_selection_popup(self):
+        songs = self.get_songs_for_selected_artists()
+        if not songs:
+            messagebox.showinfo("No Songs", "No songs found for the selected artist(s).", parent=self)
+            return
+        # Map titles to song_ids
+        title_to_ids = {}
+        for sid, title in songs:
+            title_to_ids.setdefault(title, []).append(sid)
+        titles = sorted(title_to_ids.keys(), key=lambda t: t.lower())
+        popup = tk.Toplevel(self)
+        popup.title("Select Song(s)")
+        popup.configure(bg=DARK_BG)
+        popup.geometry("400x500+%d+%d" % (self.winfo_rootx()+140, self.winfo_rooty()+140))
+        popup.transient(self)
+        popup.grab_set()
+        frame = tk.Frame(popup, bg=DARK_BG)
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+        scrollbar = tk.Scrollbar(frame, orient="vertical")
+        listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, bg="#333a40", fg=BRIGHT_FG, font=FONT_MAIN, yscrollcommand=scrollbar.set)
+        scrollbar.config(command=listbox.yview)
+        scrollbar.pack(side="right", fill="y")
+        listbox.pack(side="left", fill="both", expand=True)
+        for t in titles:
+            listbox.insert(tk.END, t)
+        # Pre-select current songs
+        current = [s.strip() for s in self.songs_var.get().split(',') if s.strip()]
+        for idx, t in enumerate(titles):
+            if t in current:
+                listbox.selection_set(idx)
+        def on_ok():
+            selected = [titles[i] for i in listbox.curselection()]
+            self.songs_var.set(', '.join(selected))
+            popup.destroy()
+        btn_frame = ttk.Frame(popup, padding=10)
+        btn_frame.pack(fill=tk.X)
+        ttk.Button(btn_frame, text="OK", command=on_ok, style="TButton").pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=popup.destroy, style="TButton").pack(side=tk.RIGHT, padx=5)
+
+        # Initialize song list
+        self.update_song_list()
+
+    def update_song_list(self, filtered_songs=None):
+        """Update the listbox with the song names."""
+        self.song_listbox.delete(0, tk.END)
+        for song in (filtered_songs or self.song_list):
+            self.song_listbox.insert(tk.END, song['title'])
+        # Select the currently assigned songs
+        for i in range(self.song_listbox.size()):
+            song_title = self.song_listbox.get(i)
+            if song_title in self.selected_songs:
+                self.song_listbox.select_set(i)
+
+    def filter_song_list(self, *args):
+        """Filter the song list based on the search query."""
+        query = self.search_var.get().strip().lower()
+        filtered_songs = [song for song in self.song_list if query in song['title'].lower()]
+        self.update_song_list(filtered_songs)
+
+    def on_song_select(self, event=None):
+        """Handle song selection from the list."""
+        selected = self.song_listbox.curselection()
+        if selected:
+            song_titles = [self.song_listbox.get(i) for i in selected]
+            self.callback(song_titles)
+            self.destroy()
+
+    def on_ok(self):
+        """Handle OK button click."""
+        self.on_song_select()
+
 class ArtistSelectPopup(tk.Toplevel):
     """
     Popup window for selecting an artist from the list.
@@ -273,3 +370,72 @@ class ArtistSelectPopup(tk.Toplevel):
     def on_ok(self):
         """Handle OK button click."""
         self.on_artist_select()
+
+class SongSelectPopup(tk.Toplevel):
+    """
+    Popup window for selecting songs from the list.
+    """
+    def __init__(self, parent, title, selected_songs, callback):
+        super().__init__(parent)
+        self.title(title)
+        self.parent = parent
+        self.callback = callback
+        self.song_list = db_operations.get_all_songs()
+        self.selected_songs = set(selected_songs)  # Use a set for faster lookup
+
+        # Search variable
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", self.filter_song_list)
+
+        # Build UI
+        self.geometry("450x350")
+        self.configure(bg=DARK_BG)
+
+        # Search box
+        search_frame = ttk.Frame(self, padding=10)
+        search_frame.pack(fill=tk.X)
+        ttk.Label(search_frame, text="Search:", background=DARK_BG, foreground=BRIGHT_FG).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(search_frame, textvariable=self.search_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+
+        # Song listbox
+        self.song_listbox = tk.Listbox(self, selectmode=tk.MULTIPLE, bg=DARK_BG, fg=BRIGHT_FG, font=FONT_MAIN)
+        self.song_listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.song_listbox.bind("<Double-Button-1>", self.on_song_select)
+
+        # Buttons
+        btn_frame = ttk.Frame(self, padding=10)
+        btn_frame.pack(fill=tk.X)
+        ttk.Button(btn_frame, text="OK", command=self.on_ok, style="TButton").pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=self.destroy, style="TButton").pack(side=tk.RIGHT, padx=5)
+
+        # Initialize song list
+        self.update_song_list()
+
+    def update_song_list(self, filtered_songs=None):
+        """Update the listbox with the song names."""
+        self.song_listbox.delete(0, tk.END)
+        for song in (filtered_songs or self.song_list):
+            self.song_listbox.insert(tk.END, song['title'])
+        # Select the currently assigned songs
+        for i in range(self.song_listbox.size()):
+            song_title = self.song_listbox.get(i)
+            if song_title in self.selected_songs:
+                self.song_listbox.select_set(i)
+
+    def filter_song_list(self, *args):
+        """Filter the song list based on the search query."""
+        query = self.search_var.get().strip().lower()
+        filtered_songs = [song for song in self.song_list if query in song['title'].lower()]
+        self.update_song_list(filtered_songs)
+
+    def on_song_select(self, event=None):
+        """Handle song selection from the list."""
+        selected = self.song_listbox.curselection()
+        if selected:
+            song_titles = [self.song_listbox.get(i) for i in selected]
+            self.callback(song_titles)
+            self.destroy()
+
+    def on_ok(self):
+        """Handle OK button click."""
+        self.on_song_select()
