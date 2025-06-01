@@ -73,15 +73,24 @@ class ModifyEntryWindow(tk.Toplevel):
         self.score_var = tk.IntVar(value=self.record.get("score") or 0)
         ttk.Spinbox(form_frame, from_=0, to=5, textvariable=self.score_var, width=5).grid(row=7, column=1, sticky="w", pady=2)
 
-        # Artists
-        ttk.Label(form_frame, text="Artists (comma-separated):", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=8, column=0, sticky="w", pady=2)
-        self.artists_var = tk.StringVar(value=self.record.get("artists_str", ""))
-        ttk.Entry(form_frame, textvariable=self.artists_var, width=60).grid(row=8, column=1, sticky="w", pady=2)
+        # Primary Artist
+        artists_list = [a['name'] for a in db_operations.get_all_artists()]
+        primary, *rest = [s.strip() for s in self.record.get("artists_str", "").split(',')]
+        secondary = rest[0] if rest else ""
+        ttk.Label(form_frame, text="Primary Artist:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=8, column=0, sticky="w", pady=2)
+        self.primary_artist_var = tk.StringVar(value=primary)
+        ttk.Entry(form_frame, textvariable=self.primary_artist_var, width=30, state='readonly').grid(row=8, column=1, sticky="w", pady=2)
+        ttk.Button(form_frame, text="Select...", command=self.show_artist_listbox_popup).grid(row=8, column=2, sticky="w", padx=5)
+        # Secondary Artist
+        ttk.Label(form_frame, text="Secondary Artist:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=9, column=0, sticky="w", pady=2)
+        self.secondary_artist_var = tk.StringVar(value=secondary)
+        ttk.Entry(form_frame, textvariable=self.secondary_artist_var, width=30, state='readonly').grid(row=9, column=1, sticky="w", pady=2)
+        ttk.Button(form_frame, text="Select...", command=self.show_secondary_artist_listbox_popup).grid(row=9, column=2, sticky="w", padx=5)
 
         # Songs
-        ttk.Label(form_frame, text="Songs (comma-separated):", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=9, column=0, sticky="w", pady=2)
+        ttk.Label(form_frame, text="Songs (comma-separated):", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=10, column=0, sticky="w", pady=2)
         self.songs_var = tk.StringVar(value=self.record.get("songs_str", ""))
-        ttk.Entry(form_frame, textvariable=self.songs_var, width=60).grid(row=9, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.songs_var, width=60).grid(row=10, column=1, sticky="w", pady=2)
 
         # Buttons
         btn_frame = ttk.Frame(self, style="TFrame")
@@ -101,7 +110,11 @@ class ModifyEntryWindow(tk.Toplevel):
         file_path2 = self.file_path2_var.get().strip() or None
         file_url = self.file_url_var.get().strip() or None
         score = self.score_var.get()
-        artists = [a.strip() for a in self.artists_var.get().split(',') if a.strip()]
+        primary_artist = self.primary_artist_var.get().strip()
+        secondary_artist = self.secondary_artist_var.get().strip()
+        artists = [primary_artist]
+        if secondary_artist and secondary_artist != primary_artist:
+            artists.append(secondary_artist)
         songs = [s.strip() for s in self.songs_var.get().split(',') if s.strip()]
         try:
             if entry_type == 'performance':
@@ -170,3 +183,93 @@ class ModifyEntryWindow(tk.Toplevel):
     def cancel(self):
         # Close without saving
         self.destroy()
+
+    def show_artist_listbox_popup(self):
+        """Show a popup to select an artist from the list."""
+        popup = ArtistSelectPopup(self, "Select Primary Artist", self.primary_artist_var.get(), self.update_primary_artist)
+        self.wait_window(popup)
+
+    def show_secondary_artist_listbox_popup(self):
+        """Show a popup to select a secondary artist from the list."""
+        popup = ArtistSelectPopup(self, "Select Secondary Artist", self.secondary_artist_var.get(), self.update_secondary_artist)
+        self.wait_window(popup)
+
+    def update_primary_artist(self, artist_name):
+        """Update the primary artist field."""
+        self.primary_artist_var.set(artist_name)
+
+    def update_secondary_artist(self, artist_name):
+        """Update the secondary artist field."""
+        self.secondary_artist_var.set(artist_name)
+
+class ArtistSelectPopup(tk.Toplevel):
+    """
+    Popup window for selecting an artist from the list.
+    """
+    def __init__(self, parent, title, selected_artist, callback):
+        super().__init__(parent)
+        self.title(title)
+        self.parent = parent
+        self.callback = callback
+        self.artist_list = db_operations.get_all_artists()
+        self.selected_artist = selected_artist
+
+        # Search variable
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", self.filter_artist_list)
+
+        # Build UI
+        self.geometry("400x300")
+        self.configure(bg=DARK_BG)
+
+        # Search box
+        search_frame = ttk.Frame(self, padding=10)
+        search_frame.pack(fill=tk.X)
+        ttk.Label(search_frame, text="Search:", background=DARK_BG, foreground=BRIGHT_FG).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(search_frame, textvariable=self.search_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+
+        # Artist listbox
+        self.artist_listbox = tk.Listbox(self, selectmode=tk.SINGLE, bg=DARK_BG, fg=BRIGHT_FG, font=FONT_MAIN)
+        self.artist_listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.artist_listbox.bind("<Double-Button-1>", self.on_artist_select)
+
+        # Buttons
+        btn_frame = ttk.Frame(self, padding=10)
+        btn_frame.pack(fill=tk.X)
+        ttk.Button(btn_frame, text="OK", command=self.on_ok, style="TButton").pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=self.destroy, style="TButton").pack(side=tk.RIGHT, padx=5)
+
+        # Initialize artist list
+        self.update_artist_list()
+
+    def update_artist_list(self, filtered_artists=None):
+        """Update the listbox with the artist names."""
+        self.artist_listbox.delete(0, tk.END)
+        for artist in (filtered_artists or self.artist_list):
+            self.artist_listbox.insert(tk.END, artist['name'])
+        # Select the current artist
+        if self.selected_artist:
+            try:
+                index = next(i for i, artist in enumerate(self.artist_list) if artist['name'] == self.selected_artist)
+                self.artist_listbox.select_set(index)
+                self.artist_listbox.see(index)
+            except StopIteration:
+                pass  # Current artist not in list, do not select any
+
+    def filter_artist_list(self, *args):
+        """Filter the artist list based on the search query."""
+        query = self.search_var.get().strip().lower()
+        filtered_artists = [artist for artist in self.artist_list if query in artist['name'].lower()]
+        self.update_artist_list(filtered_artists)
+
+    def on_artist_select(self, event=None):
+        """Handle artist selection from the list."""
+        selected = self.artist_listbox.curselection()
+        if selected:
+            artist_name = self.artist_listbox.get(selected)
+            self.callback(artist_name)
+            self.destroy()
+
+    def on_ok(self):
+        """Handle OK button click."""
+        self.on_artist_select()
