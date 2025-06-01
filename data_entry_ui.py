@@ -779,6 +779,9 @@ class DataEntryWindow(tk.Toplevel):
                     # Use the best match if it meets our confidence threshold
                     if score >= 60:  # High confidence match
                         self.primary_artist_var.set(best_artist_match['name'])
+                        
+                        # After setting the artist, try to detect and select songs
+                        self.detect_and_prefill_songs_from_filename(filename)
                     else:
                         # Fall back to the simple string matching function for low confidence matches
                         artist_names = [artist['name'] for artist in self.all_artists_list]
@@ -787,6 +790,9 @@ class DataEntryWindow(tk.Toplevel):
                         # If we found any artists, use the first one (highest confidence match)
                         if found_artists:
                             self.primary_artist_var.set(found_artists[0])
+                            
+                            # After setting the artist, try to detect and select songs
+                            self.detect_and_prefill_songs_from_filename(filename)
                             
                             # If we found multiple artists, show a message about other potential matches
                             if len(found_artists) > 1:
@@ -1187,6 +1193,53 @@ class DataEntryWindow(tk.Toplevel):
         cancel_btn.pack(side=tk.RIGHT, padx=4)
 
         listbox.focus_set()
+
+    def detect_and_prefill_songs_from_filename(self, filename):
+        """
+        Try to detect songs in the filename based on the selected artist and prefill the song selection.
+        This method should be called after setting the primary artist.
+        """
+        if not filename or not self.primary_artist_var.get():
+            return
+            
+        # First, get all songs for the selected artist
+        songs = self.get_songs_for_selected_artists()
+        if not songs:
+            print("No songs found for the selected artist")
+            return
+            
+        # Use our utility function to find song matches in the filename
+        song_matches = utils.find_song_in_filename(filename, songs, detailed=True)
+        
+        if not song_matches:
+            print("No song matches found in filename")
+            return
+            
+        # Process the matches to select songs
+        high_confidence_matches = [match for match in song_matches if match[2] >= 70]  # Score >= 70
+        
+        if high_confidence_matches:
+            # Clear existing song selections
+            self.selected_song_ids = []
+            self.selected_song_titles = []
+            
+            # Add all high confidence matches
+            selected_titles = set()  # Use a set to avoid duplicates
+            for song_id, song_title, score, match_type in high_confidence_matches[:3]:  # Limit to top 3
+                if song_title not in selected_titles:  # Avoid duplicates
+                    self.selected_song_ids.append(song_id)
+                    self.selected_song_titles.append(song_title)
+                    selected_titles.add(song_title)
+            
+            if self.selected_song_titles:
+                print(f"Auto-selected songs from filename: {', '.join(self.selected_song_titles)}")
+                # Update the title field based on the selected songs
+                self.update_title_from_songs()
+                
+                # Refresh the UI to show selected songs
+                # This will happen in handle_proceed later
+        else:
+            print("No high confidence song matches found")
 
     def remove_selected_song(self, idx):
         title_to_remove = self.selected_song_titles[idx]
