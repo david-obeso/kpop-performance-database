@@ -273,9 +273,11 @@ class KpopDBBrowser(tk.Tk):
         self.artist_var = tk.StringVar()
         self.artist_dropdown = ttk.Combobox(filter_frame, textvariable=self.artist_var,
                                            state="readonly", style="Custom.TCombobox",
-                                           width=30)
+                                           width=40)
         self.artist_dropdown.pack(side="left", padx=5, ipadx=5, ipady=6)
         self.artist_dropdown.bind("<<ComboboxSelected>>", lambda e: self.update_list())
+        # Enable keyboard navigation: jump to artist starting with typed letter
+        self.artist_dropdown.bind("<KeyPress>", self.handle_artist_combo_keypress)
         
         ttk.Label(filter_frame, text="Date (YYYY or YYYY-MM):").pack(side="left", padx=(15,0))
         self.date_var = tk.StringVar()
@@ -408,6 +410,26 @@ class KpopDBBrowser(tk.Tk):
         self.search_var.set(""); self.artist_var.set(""); self.date_var.set(""); self.filter_4k_var.set(False)
         self.show_mv_var.set(True); self.show_perf_var.set(True); self.show_url_only_var.set(True); self.show_local_var.set(True); self.show_new_var.set(False)
         self.update_list()
+
+    # New keyboard navigation handler for artist combobox
+    def handle_artist_combo_keypress(self, event):
+        if event.char and event.char.isalnum():
+            typed = event.char.lower()
+            values = self.artist_dropdown.cget("values")
+            if not values:
+                return
+            current = self.artist_var.get()
+            try:
+                idx = values.index(current)
+                start = (idx + 1) % len(values)
+            except ValueError:
+                start = 0
+            # Search forward from next index, then wrap around
+            for i in list(range(start, len(values))) + list(range(0, start)):
+                if values[i].lower().startswith(typed):
+                    self.artist_var.set(values[i])
+                    self.update_list()
+                    return
 
     def load_artists(self):
         self.artists_list = db_operations.get_all_artists()
