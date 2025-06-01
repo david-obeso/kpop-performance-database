@@ -13,6 +13,18 @@ def get_db_connection():
         try:
             _connection = sqlite3.connect(config.DATABASE_FILE)
             print(f"Database connection established to {config.DATABASE_FILE}") # Keep this one
+            # Create indexes to speed up queries on large tables
+            try:
+                _connection.execute("CREATE INDEX IF NOT EXISTS idx_performance_date ON performances(performance_date)")
+                _connection.execute("CREATE INDEX IF NOT EXISTS idx_perf_artist_link_perf_id ON performance_artist_link(performance_id)")
+                _connection.execute("CREATE INDEX IF NOT EXISTS idx_song_perf_link_perf_id ON song_performance_link(performance_id)")
+                _connection.execute("CREATE INDEX IF NOT EXISTS idx_music_video_date ON music_videos(release_date)")
+                _connection.execute("CREATE INDEX IF NOT EXISTS idx_mv_artist_link_mv_id ON music_video_artist_link(mv_id)")
+                _connection.execute("CREATE INDEX IF NOT EXISTS idx_song_mv_link_mv_id ON song_music_video_link(music_video_id)")
+                _connection.execute("CREATE INDEX IF NOT EXISTS idx_artists_name ON artists(artist_name)")
+                _connection.commit()
+            except sqlite3.Error as e:
+                print(f"Error creating indexes: {e}")
         except sqlite3.Error as e:
             print(f"Error connecting to database: {e}")
             _connection = None 
