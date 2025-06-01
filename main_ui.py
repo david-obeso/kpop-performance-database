@@ -208,7 +208,7 @@ class KpopDBBrowser(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"K-Pop Performance Database Browser v{APP_VERSION}") 
-        self.geometry("2200x950") 
+        self.geometry("2560x950") 
         self.configure(bg=DARK_BG)
 
         self.option_add('*TCombobox*Listbox.background', '#333a40') 
@@ -271,7 +271,9 @@ class KpopDBBrowser(tk.Tk):
 
         ttk.Label(filter_frame, text="Artist:").pack(side="left")
         self.artist_var = tk.StringVar()
-        self.artist_dropdown = ttk.Combobox(filter_frame, textvariable=self.artist_var, state="readonly", style="Custom.TCombobox", width=25)
+        self.artist_dropdown = ttk.Combobox(filter_frame, textvariable=self.artist_var,
+                                           state="readonly", style="Custom.TCombobox",
+                                           width=30)
         self.artist_dropdown.pack(side="left", padx=5, ipadx=5, ipady=6)
         self.artist_dropdown.bind("<<ComboboxSelected>>", lambda e: self.update_list())
         
@@ -280,10 +282,12 @@ class KpopDBBrowser(tk.Tk):
         date_entry = tk.Entry(filter_frame, textvariable=self.date_var, width=10, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, insertbackground=BRIGHT_FG)
         date_entry.pack(side="left", padx=5, ipadx=5, ipady=3); date_entry.bind("<KeyRelease>", lambda e: self.update_list())
         
-        ttk.Label(filter_frame, text="4K?:").pack(side="left", padx=(15,0))
+        # 4K filter: checkbox with label on the right
         self.filter_4k_var = tk.BooleanVar(value=False)
-        filter_4k_checkbutton = ttk.Checkbutton(filter_frame, variable=self.filter_4k_var, command=self.update_list)
-        filter_4k_checkbutton.pack(side="left", padx=(2, 10))
+        filter_4k_checkbutton = ttk.Checkbutton(filter_frame, variable=self.filter_4k_var,
+                                               text="4K", command=self.update_list)
+        filter_4k_checkbutton.pack(side="left", padx=(15, 10))
+
         # New records only (score 0 or None)
         self.new_checkbox = ttk.Checkbutton(filter_frame, text="New", variable=self.show_new_var, command=self.update_list)
         self.new_checkbox.pack(side="left", padx=(2, 10))
@@ -295,7 +299,7 @@ class KpopDBBrowser(tk.Tk):
         
         ttk.Button(filter_frame, text="Clear", command=self.clear_search).pack(side="left", padx=5, ipadx=8, ipady=3)
 
-        header_text = (f"{'Date':<12} | {'Artist(s)':<30} | {'Performance Title':<50} | {'Show Type':<25} | "
+        header_text = (f"{'Date':<12} | {'Artist(s)':<30} | {'Performance Title':<85} | {'Show Type':<20} | "
                        f"{'Res':<8} | {'Score':<5} | {'Source'}")
         header = tk.Label(self, text=header_text, font=FONT_HEADER, anchor="w", bg=DARK_BG, fg=BRIGHT_FG)
         header.pack(fill="x", padx=10, pady=(5,0))
@@ -406,10 +410,12 @@ class KpopDBBrowser(tk.Tk):
         self.update_list()
 
     def load_artists(self):
-        self.artists_list = db_operations.get_all_artists() 
-        artist_names = [""] + [artist['name'] for artist in self.artists_list]
+        self.artists_list = db_operations.get_all_artists()
+        # Sort artist names alphabetically, ignoring case, then add blank at top
+        sorted_names = sorted([artist['name'] for artist in self.artists_list], key=lambda n: n.lower())
+        artist_names = [""] + sorted_names
         self.artist_dropdown["values"] = artist_names
-        if artist_names: 
+        if artist_names:
             self.artist_var.set(artist_names[0])
 
     def load_performances(self):
@@ -506,8 +512,8 @@ class KpopDBBrowser(tk.Tk):
                 elif perf_data.get("file_url"): source_text = "Web URL"
                 else: source_text = "Local File"
             
-            display_string = (f"{disp_date:<12} | {disp_artists:<30.30} | {disp_perf_title:<50.50} | "
-                              f"{disp_show_type:<25.25} | {disp_res:<8.8} | {disp_score:<5} | {source_text}")
+            display_string = (f"{disp_date:<12} | {disp_artists:<30.30} | {disp_perf_title:<85.85} | "
+                              f"{disp_show_type:<20.20} | {disp_res:<8.8} | {disp_score:<5} | {source_text}")
 
             if search_term:
                 searchable_content = " ".join(filter(None, [
