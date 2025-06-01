@@ -498,9 +498,9 @@ class DataEntryWindow(tk.Toplevel):
         if source_type == "url":
             item_name_display = entry_type.replace('_', ' ').title()
             self.build_url_entry_ui(item_name=item_name_display)
+            # Disable proceed since next step is Save/Confirm
+            self.proceed_button.config(state=tk.DISABLED)
             
-            # Existing logic to potentially show confirmation popup immediately
-            # This might be better handled by a separate "Save/Confirm" button in a later step
             if entry_type == "music_video":
                 if self._all_mv_url_fields_filled():
                     self._show_mv_url_confirmation_popup()
@@ -512,6 +512,8 @@ class DataEntryWindow(tk.Toplevel):
         elif source_type == "local_file":
             item_name_display = entry_type.replace('_', ' ').title()
             self.build_local_file_entry_ui(item_name=item_name_display)
+            # Disable proceed since Save Entry button handles saving
+            self.proceed_button.config(state=tk.DISABLED)
             return # Done with local file UI setup
 
         # Fallback for any unhandled combination (should ideally not be reached
@@ -560,6 +562,14 @@ class DataEntryWindow(tk.Toplevel):
         def show_menu(event):
             menu.tk_popup(event.x_root, event.y_root)
         entry_widget.bind("<Button-3>", show_menu)
+
+    def _convert_yymmdd_to_yyyy_mm_dd(self, yymmdd):
+        """Convert YYMMDD string to YYYY-MM-DD or return None if invalid."""
+        try:
+            dt = datetime.datetime.strptime(yymmdd, "%y%m%d")
+            return dt.strftime("%Y-%m-%d")
+        except Exception:
+            return None
 
     def build_url_entry_ui(self, item_name):
         # content_area_frame is already cleared by handle_proceed
@@ -670,7 +680,34 @@ class DataEntryWindow(tk.Toplevel):
         if self._validate_local_file_data():
             self.local_file_validation_label_var.set("") # Clear validation message on success
             entry_type = self.entry_type_var.get()
-            self.confirm_and_save_entry(entry_type, source_type="local_file")
+            # Prepare data and insert into DB for local file entries
+            raw_date = self.date_var.get().strip()
+            formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
+            perf_date = formatted_date if formatted_date else raw_date
+            # Build artist names list
+            artist_names = [self.primary_artist_var.get().strip()] + ([self.secondary_artist_var.get().strip()] if self.secondary_artist_var.get().strip() else [])
+            song_titles = self.selected_song_titles
+
+            # Insert record based on entry type
+            if entry_type == "performance":
+                show_type = self.show_type_var.get().strip()
+                resolution = self.resolution_var.get().strip()
+                self.db_ops.insert_performance(title=self.title_var.get().strip(), performance_date=perf_date,
+                                               show_type=show_type, resolution=resolution,
+                                               file_path1=self.selected_local_files[0], file_url=None,
+                                               score=0, artist_names=artist_names,
+                                               song_titles=song_titles)
+                messagebox.showinfo("Saved", f"Performance '{self.title_var.get().strip()}' saved successfully.", parent=self)
+            else:
+                self.db_ops.insert_music_video(title=self.title_var.get().strip(), release_date=perf_date,
+                                               file_path1=self.selected_local_files[0], file_url=None,
+                                               score=0, artist_names=artist_names,
+                                               song_titles=song_titles)
+                messagebox.showinfo("Saved", f"Music Video '{self.title_var.get().strip()}' saved successfully.", parent=self)
+            # Close window after successful save
+            self.close_window()
+            return
+
         # If validation fails, the message is already set by _validate_local_file_data
 
     def browse_local_files(self):
@@ -1176,31 +1213,31 @@ class DataEntryWindow(tk.Toplevel):
                 messagebox.showerror("Duplicate Entry", msg, parent=self)
                 return
 
-            data_to_save = {
-                "Entry Type": entry_type,
-                "Primary Artist": primary_artist,
-                "Secondary Artist": secondary_artist,
-                "Song Titles": song_titles,
-                "Title": title,
-                "Date (YYMMDD)": date_yyyymmdd,
-                "File Path": file_path1,
-            }
-
+            # Prepare data and insert into DB for local file entries
+            raw_date = date_yyyymmdd
+            formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
+            perf_date = formatted_date if formatted_date else raw_date
+            # Build artist names list
+            artist_names = [primary_artist] + ([secondary_artist] if secondary_artist else [])
+            # Insert record based on entry type
             if entry_type == "performance":
-                data_to_save["Show Type"] = self.show_type_var.get().strip()
-                data_to_save["Resolution"] = self.resolution_var.get().strip()
-            
-            # --- Placeholder: Show data that would be saved ---
-            info_message = "The following data would be saved for a local file entry:\n\n"
-            for key, value in data_to_save.items():
-                info_message += f"- {key}: {value}\n"
-            
-            messagebox.showinfo("Local File Save (Placeholder)", info_message, parent=self)
-            
-            # Future: Call actual db_ops.add_performance or db_ops.add_music_video with file_path1
-
-            # After successful save, you might want to reset fields or close the window
-            # self.reset_form_fields() or self.close_window()
+                show_type = self.show_type_var.get().strip()
+                resolution = self.resolution_var.get().strip()
+                self.db_ops.insert_performance(title=title, performance_date=perf_date,
+                                               show_type=show_type, resolution=resolution,
+                                               file_path1=file_path1, file_url=None,
+                                               score=0, artist_names=artist_names,
+                                               song_titles=song_titles)
+                messagebox.showinfo("Saved", f"Performance '{title}' saved successfully.", parent=self)
+            else:
+                self.db_ops.insert_music_video(title=title, release_date=perf_date,
+                                               file_path1=file_path1, file_url=None,
+                                               score=0, artist_names=artist_names,
+                                               song_titles=song_titles)
+                messagebox.showinfo("Saved", f"Music Video '{title}' saved successfully.", parent=self)
+            # Close window after successful save
+            self.close_window()
+            return
 
         else:
             messagebox.showerror("Error", f"Unknown source type: {source_type}", parent=self)

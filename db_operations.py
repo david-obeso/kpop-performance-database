@@ -88,13 +88,17 @@ def get_all_performances_raw():
         print(f"AttributeError in get_all_performances_raw (likely conn is None): {e}")
     return performances_raw
 
-def insert_music_video(title, release_date, file_url, score, artist_names, song_titles):
+def insert_music_video(title, release_date, file_path1=None, file_url=None, score=0, artist_names=None, song_titles=None):
+    if artist_names is None:
+        artist_names = []
+    if song_titles is None:
+        song_titles = []
     conn = get_db_connection()
     cursor = conn.cursor()
-    # 1. Insert music video
+    # 1. Insert music video (including file_path1)
     cursor.execute(
-        "INSERT INTO music_videos (title, release_date, file_url, score) VALUES (?, ?, ?, ?)",
-        (title, release_date, file_url, score)
+        "INSERT INTO music_videos (title, release_date, file_path1, file_url, score) VALUES (?, ?, ?, ?, ?)",
+        (title, release_date, file_path1, file_url, score)
     )
     mv_id = cursor.lastrowid
     # 2. Link artists
@@ -163,13 +167,17 @@ def get_all_music_videos_raw():
         print(f"AttributeError in get_all_music_videos_raw (likely conn is None): {e}")
     return music_videos_raw
 
-def insert_performance(title, performance_date, show_type, resolution, file_url, score, artist_names, song_titles):
+def insert_performance(title, performance_date, show_type, resolution, file_path1=None, file_url=None, score=0, artist_names=None, song_titles=None):
+    if artist_names is None:
+        artist_names = []
+    if song_titles is None:
+        song_titles = []
     conn = get_db_connection()
     cursor = conn.cursor()
-    # 1. Insert performance (file_path1 and file_path2 left NULL for URL-only entries)
+    # 1. Insert performance (including file_path1)
     cursor.execute(
-        "INSERT INTO performances (title, performance_date, show_type, resolution, file_url, score) VALUES (?, ?, ?, ?, ?, ?)",
-        (title, performance_date, show_type, resolution, file_url, score)
+        "INSERT INTO performances (title, performance_date, show_type, resolution, file_path1, file_url, score) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (title, performance_date, show_type, resolution, file_path1, file_url, score)
     )
     perf_id = cursor.lastrowid
     # 2. Link artists
