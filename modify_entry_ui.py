@@ -56,17 +56,17 @@ class ModifyEntryWindow(tk.Toplevel):
         # File Path1
         ttk.Label(form_frame, text="File Path1:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=4, column=0, sticky="w", pady=2)
         self.file_path1_var = tk.StringVar(value=self.record.get("file_path1", "") or "")
-        ttk.Entry(form_frame, textvariable=self.file_path1_var, width=60).grid(row=4, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.file_path1_var, width=60, state='readonly').grid(row=4, column=1, sticky="w", pady=2)
 
         # File Path2
         ttk.Label(form_frame, text="File Path2:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=5, column=0, sticky="w", pady=2)
         self.file_path2_var = tk.StringVar(value=self.record.get("file_path2", "") or "")
-        ttk.Entry(form_frame, textvariable=self.file_path2_var, width=60).grid(row=5, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.file_path2_var, width=60, state='readonly').grid(row=5, column=1, sticky="w", pady=2)
 
         # URL
         ttk.Label(form_frame, text="URL:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=6, column=0, sticky="w", pady=2)
         self.file_url_var = tk.StringVar(value=self.record.get("file_url", "") or "")
-        ttk.Entry(form_frame, textvariable=self.file_url_var, width=60).grid(row=6, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.file_url_var, width=60, state='readonly').grid(row=6, column=1, sticky="w", pady=2)
 
         # Score
         ttk.Label(form_frame, text="Score:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=7, column=0, sticky="w", pady=2)
