@@ -770,10 +770,34 @@ class DataEntryWindow(tk.Toplevel):
             
             # Try to find artist name in the filename and prefill the primary artist field
             if self.all_artists_list:
-                artist_names = [artist['name'] for artist in self.all_artists_list]
-                found_artists = utils.find_string_in_filename(filename, artist_names)
-                if len(found_artists) == 1:
-                    self.primary_artist_var.set(found_artists[0])
+                # Use the enhanced artist detection function with detailed results
+                result = utils.find_artist_in_filename(filename, self.all_artists_list, detailed=True)
+                
+                if result:
+                    best_artist_match, score, match_type = result
+                    
+                    # Use the best match if it meets our confidence threshold
+                    if score >= 60:  # High confidence match
+                        self.primary_artist_var.set(best_artist_match['name'])
+                    else:
+                        # Fall back to the simple string matching function for low confidence matches
+                        artist_names = [artist['name'] for artist in self.all_artists_list]
+                        found_artists = utils.find_string_in_filename(filename, artist_names)
+                        
+                        # If we found any artists, use the first one (highest confidence match)
+                        if found_artists:
+                            self.primary_artist_var.set(found_artists[0])
+                            
+                            # If we found multiple artists, show a message about other potential matches
+                            if len(found_artists) > 1:
+                                other_artists = ", ".join(found_artists[1:3])  # Show up to 2 additional matches
+                                additional = len(found_artists) - 3
+                                if additional > 0:
+                                    other_artists += f" and {additional} more"
+                                print(f"Multiple artists matched: Selected {found_artists[0]}. Other potential matches: {other_artists}")
+                else:
+                    # No artists detected in filename
+                    pass
                 
             # Enable play button when a file is selected
             if hasattr(self, 'play_button'):

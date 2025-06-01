@@ -1,4 +1,5 @@
 # utils.py
+# Utility functions for the K-pop performance database application
 import os
 import re
 # from urllib.parse import urlparse # Not strictly needed by is_youtube_url as implemented
@@ -70,6 +71,7 @@ def extract_date_from_filepath(filepath):
 def find_string_in_filename(filepath, search_strings):
     """
     Check if any of the specified strings are present in the filename portion of a filepath.
+    Enhanced to better handle multi-word artist names by using different matching strategies.
     
     Args:
         filepath (str): A filepath
@@ -77,7 +79,7 @@ def find_string_in_filename(filepath, search_strings):
         
     Returns:
         list: A list of strings from search_strings that were found in the filename,
-              or an empty list if none were found
+              in order of confidence (most confident first), or an empty list if none were found
     """
     # Extract filename from path
     filename = os.path.basename(filepath)
@@ -86,10 +88,197 @@ def find_string_in_filename(filepath, search_strings):
     if isinstance(search_strings, str):
         search_strings = [search_strings]
     
-    # Check which strings are in the filename
-    found_matches = []
-    for search_string in search_strings:
-        if search_string in filename:
-            found_matches.append(search_string)
+    # Prepare normalized versions of the filename
+    # 1. Convert to lowercase for case-insensitive matching
+    filename_lower = filename.lower()
+    # 2. Replace common delimiters with spaces
+    normalized_filename = re.sub(r'[_\-.]', ' ', filename_lower)
+    # 3. Create a version with no spaces
+    nospace_filename = re.sub(r'\s+', '', normalized_filename)
     
-    return found_matches
+    # Different match levels with confidence scores
+    exact_matches = []  # Highest confidence
+    normalized_matches = []  # Medium confidence
+    nospace_matches = []  # Lower confidence
+    
+    for search_string in search_strings:
+        search_lower = search_string.lower()
+        search_normalized = re.sub(r'[_\-.]', ' ', search_lower)
+        search_nospace = re.sub(r'\s+', '', search_normalized)
+        
+        # Check for exact match in original filename (highest confidence)
+        if search_string in filename or search_lower in filename_lower:
+            exact_matches.append(search_string)
+        
+        # Check for match in normalized filename (spaces, underscores, hyphens normalized)
+        elif search_normalized in normalized_filename:
+            normalized_matches.append(search_string)
+            
+        # Check for match with no spaces (for cases like RedVelvet vs Red Velvet)
+        elif search_nospace in nospace_filename:
+            nospace_matches.append(search_string)
+            
+        # For multi-word searches, check if all words appear in the filename
+        elif ' ' in search_normalized:
+            words = search_normalized.split()
+            if all(word in normalized_filename for word in words):
+                normalized_matches.append(search_string)
+
+    # Return matches in order of confidence
+    return exact_matches + normalized_matches + nospace_matches
+
+def find_artist_in_filename(filepath, artist_list, detailed=False):
+    """
+    Specialized function to find artist names in filenames with high accuracy.
+    
+    Args:
+        filepath (str): A filepath
+        artist_list (list): A list of artist dictionaries with 'id' and 'name' keys
+        detailed (bool): Whether to return detailed matching information (default: False)
+        
+    Returns:
+        dict or tuple: The artist dictionary with the highest confidence match or None if no match.
+                      If detailed=True, returns (artist_dict, confidence_score, match_type)
+    """
+    if not filepath or not artist_list:
+        return None
+        
+    # Get the filename
+    filename = os.path.basename(filepath)
+    filename_lower = filename.lower()
+    
+    # Create a scoring system for matches
+    matches = []
+    
+    for artist in artist_list:
+        artist_name = artist['name']
+        artist_lower = artist_name.lower()
+        
+        score = 0
+        match_type = None
+        
+        # Check for exact match
+        if artist_name in filename or artist_lower in filename_lower:
+            score = 100
+            match_type = "exact"
+        
+        # Normalize both strings for comparison
+        artist_norm = re.sub(r'[_\-.]', ' ', artist_lower)
+        filename_norm = re.sub(r'[_\-.]', ' ', filename_lower)
+        
+        # Check for normalized match
+        if score == 0 and artist_norm in filename_norm:
+            score = 80
+            match_type = "normalized"
+        
+        # Check for no-space match (this handles cases like "GirlsGeneration" vs "Girls Generation")
+        if score == 0:
+            artist_nospace = re.sub(r'\s+', '', artist_norm)
+            filename_nospace = re.sub(r'\s+', '', filename_norm)
+            
+            # Special pattern check for multi-word artists with no spaces
+            if ' ' in artist_norm and artist_nospace in filename_nospace:
+                # Prioritize multi-word artists with higher scores
+                word_count = len(artist_norm.split())
+                # Base score plus bonuses for length and word count
+                score = 70 + min(len(artist_nospace) // 2, 15) + (word_count * 5)
+                match_type = "nospace-multiword"
+            elif artist_nospace in filename_nospace:
+                # Regular no-space match for single-word artists
+                score = 60 + min(len(artist_nospace) // 2, 15)
+                match_type = "nospace"
+        
+        # For multi-word artists, check if all words are in the filename
+        if score == 0 and ' ' in artist_norm:
+            words = artist_norm.split()
+            
+            # Check if all words from the artist name are in the filename
+            all_words_match = all(word in filename_norm for word in words)
+            
+            if all_words_match:
+                # The longer the artist name (more words), the higher the confidence
+                score = 40 + min(len(words) * 5, 30)  # Cap at 70
+                match_type = "words"
+                
+                # Bonus if the words appear close to each other
+                word_positions = []
+                for word in words:
+                    if word in filename_norm:
+                        word_positions.append(filename_norm.find(word))
+                
+                if word_positions:
+                    max_gap = max(word_positions) - min(word_positions)
+                    # Smaller gaps = higher confidence
+                    if max_gap < len(' '.join(words)) * 2:
+                        score += 10
+                        
+                # Add bonus for longer, more specific artist names to avoid short names matching everywhere
+                if len(artist_lower) > 3:  # More than 3 characters
+                    score += min(len(artist_lower), 10)  # Up to 10 bonus points for long names
+                    
+        # Additional check for very short artist names (like "IVE") to avoid false positives
+        if score > 0:
+            if len(artist_lower) <= 3:  # Very short name (like "IVE")
+                # For very short names, we should be more strict to avoid false matches
+                if match_type not in ["exact", "normalized"]:
+                    # Penalize short names that aren't exact matches
+                    score -= 30
+                    
+            # Additional check for substring issues (e.g., "IVE" in "annIVErsary")
+            # Apply this check to any short artist name or known problematic ones
+            if len(artist_lower) <= 5 or artist_lower in ["ive", "the", "in", "on", "at", "to", "and"]:
+                # Check if the artist name might be part of another word
+                artist_pos = filename_lower.find(artist_lower)
+                if artist_pos > 0 and artist_pos + len(artist_lower) < len(filename_lower):
+                    # Check characters before and after the match
+                    char_before = filename_lower[artist_pos - 1]
+                    char_after = filename_lower[artist_pos + len(artist_lower)]
+                    if char_before.isalpha() or char_after.isalpha():
+                        # It's likely part of another word, so heavily penalize
+                        # The penalty is proportional to how short the name is
+                        penalty = 70 - (len(artist_lower) * 10)  # Shorter names get bigger penalties
+                        score -= max(30, min(penalty, 50))  # Between 30-50 depending on length
+                        
+        # If we found a match, add it to our list
+        if score > 0:
+            matches.append({
+                'artist': artist,
+                'score': score,
+                'match_type': match_type
+            })
+    
+    # Sort matches by score (highest first)
+    matches.sort(key=lambda x: x['score'], reverse=True)
+    
+    # Special case: If we have multiple matches and they're very close in score,
+    # prefer the longer artist name as it's likely more specific
+    if len(matches) > 1:
+        top_score = matches[0]['score']
+        close_matches = [m for m in matches if m['score'] >= top_score - 10]
+        
+        if len(close_matches) > 1:
+            # Sort by length of artist name (longer names first)
+            close_matches.sort(key=lambda x: len(x['artist']['name']), reverse=True)
+            matches[0] = close_matches[0]  # Replace the top match
+    
+    # Special case for specific problematic patterns
+    # Handle the case of "GirlsGeneration" and "IVE"
+    artists_map = {a['artist']['name'].lower(): a for a in matches}
+    if "girls generation" in artists_map and "ive" in artists_map:
+        filename_lower = os.path.basename(filepath).lower()
+        # If the filename contains "generation" or "girls", prioritize "Girls Generation"
+        if "girls" in filename_lower or "generation" in filename_lower or "girlsgeneration" in filename_lower:
+            matches[0] = artists_map["girls generation"]
+    
+    # Return results based on the detailed parameter
+    if not matches:
+        return None
+        
+    # Get the best match
+    best_match = matches[0]
+    
+    # Return based on detailed parameter
+    if detailed:
+        return (best_match['artist'], best_match['score'], best_match['match_type'])
+    else:
+        return best_match['artist']
