@@ -3,6 +3,9 @@ from tkinter import ttk, messagebox
 
 import db_operations
 import utils
+import subprocess
+import webbrowser
+import config
 
 # UI theme constants
 DARK_BG = "#222222"
@@ -83,6 +86,8 @@ class ModifyEntryWindow(tk.Toplevel):
         # Buttons
         btn_frame = ttk.Frame(self, style="TFrame")
         btn_frame.pack(fill=tk.X, pady=10)
+        # Play button to preview media before saving
+        ttk.Button(btn_frame, text="Play", command=self.play_current_entry, style="TButton").pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Save", command=self.save_modified_entry, style="TButton").pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn_frame, text="Delete", command=self.delete_entry, style="TButton").pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn_frame, text="Cancel", command=self.cancel, style="TButton").pack(side=tk.RIGHT, padx=5)
@@ -147,6 +152,20 @@ class ModifyEntryWindow(tk.Toplevel):
         if self.refresh_callback:
             self.refresh_callback()
         self.destroy()
+    
+    def play_current_entry(self):
+        """Plays the current record's media for preview."""
+        path, is_yt = utils.get_playable_path_info(self.record)
+        if not path:
+            messagebox.showerror("Play Error", "No media path or URL available to play.", parent=self)
+            return
+        try:
+            if is_yt:
+                webbrowser.open_new_tab(path)
+            else:
+                subprocess.Popen([config.MPV_PLAYER_PATH, path])
+        except Exception as e:
+            messagebox.showerror("Play Error", f"Failed to play media: {e}", parent=self)
 
     def cancel(self):
         # Close without saving
