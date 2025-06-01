@@ -30,7 +30,7 @@ FONT_ENTRY_DATA_UI = ("Courier New", 13)
 class DataEntryWindow(tk.Toplevel):
     def __init__(self, master, db_ops): 
         super().__init__(master)
-        self.title("Add or Modify Database Entry") # Unified title
+        self.title("Add Database Entry")  # Simplify window title
         self.geometry("900x1000")  # Or adjust as needed
         self.configure(bg=DARK_BG)
         self.transient(master)
@@ -728,13 +728,30 @@ class DataEntryWindow(tk.Toplevel):
             ('All files', '*.*')
         )
         
+        # Determine last used directory from user home store
+        store_path = os.path.expanduser('~/.kpop_last_dir.txt')
+        initial_dir = None
+        try:
+            with open(store_path, 'r') as sf:
+                last = sf.read().strip()
+                if last and os.path.isdir(last):
+                    initial_dir = last
+        except Exception:
+            pass
         filename = filedialog.askopenfilename(
             title='Select Local Media File',
             filetypes=filetypes,
-            parent=self 
+            parent=self,
+            initialdir=initial_dir
         )
         # Only one file allowed
         if filename:
+            # Save directory for next time
+            try:
+                with open(store_path, 'w') as sf:
+                    sf.write(os.path.dirname(filename))
+            except Exception:
+                pass
             self.selected_local_files = [filename]
             self.local_files_display_var.set(f"Selected: {filename}")
         else:
