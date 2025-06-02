@@ -644,7 +644,7 @@ class DataEntryWindow(tk.Toplevel):
         self._build_common_entry_details_ui(details_frame)
 
         # --- Validation Message Label ---
-        validation_label = ttk.Label(step_frame, textvariable=self.local_file_validation_label_var, foreground="red", style="DataEntry.TLabel", wraplength=700, bg=DARK_BG)
+        validation_label = ttk.Label(step_frame, textvariable=self.local_file_validation_label_var, foreground="red", style="DataEntry.TLabel", wraplength=700)
         validation_label.pack(pady=(5,0), anchor="w", padx=10)
 
         # --- Save Button ---
