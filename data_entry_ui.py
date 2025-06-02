@@ -652,9 +652,6 @@ class DataEntryWindow(tk.Toplevel):
         save_button_frame.pack(fill="x", pady=(10,5), padx=10)
         save_button = ttk.Button(save_button_frame, text="Save Entry", command=self._attempt_save_local_entry, style="DataEntry.TButton")
         save_button.pack(side=tk.RIGHT, padx=5)
-        # Button to play the selected media file
-        self.play_button = ttk.Button(save_button_frame, text="Play Selected File", command=self.play_selected_file, style="DataEntry.TButton", state=tk.DISABLED)
-        self.play_button.pack(side=tk.RIGHT, padx=5)
 
 
     def _validate_local_file_data(self):
