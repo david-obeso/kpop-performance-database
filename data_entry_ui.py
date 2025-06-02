@@ -589,19 +589,23 @@ class DataEntryWindow(tk.Toplevel):
         dlg.geometry("1200x800")
         dlg.transient(self)
         dlg.grab_set()
+        dlg.configure(bg=DARK_BG)
         # Directory entry and Up button
         dir_var = tk.StringVar(value=initialdir or os.getcwd())
-        path_entry = ttk.Entry(dlg, textvariable=dir_var, width=80)
+        path_entry = ttk.Entry(dlg, textvariable=dir_var, width=80, style="DataEntry.TEntry")
         path_entry.pack(fill="x", padx=5, pady=5)
-        nav_frame = ttk.Frame(dlg)
+        nav_frame = ttk.Frame(dlg, style="DataEntry.TFrame")
         nav_frame.pack(fill="x", padx=5)
-        ttk.Button(nav_frame, text="Up", command=lambda: dir_var.set(os.path.dirname(dir_var.get()))).pack(side="left")
+        ttk.Button(nav_frame, text="Up", command=lambda: dir_var.set(os.path.dirname(dir_var.get())), style="DataEntry.TButton").pack(side="left")
         # File list
-        list_frame = ttk.Frame(dlg)
+        list_frame = ttk.Frame(dlg, style="DataEntry.TFrame")
         list_frame.pack(fill="both", expand=True, padx=5, pady=5)
         vbar = ttk.Scrollbar(list_frame, orient="vertical")
         hbar = ttk.Scrollbar(list_frame, orient="horizontal")
-        lb = tk.Listbox(list_frame, yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+        lb = tk.Listbox(list_frame, bg=DARK_BG, fg=BRIGHT_FG,
+                        selectbackground=ACCENT, selectforeground=BRIGHT_FG,
+                        highlightbackground=ACCENT, relief="flat", borderwidth=0,
+                        yscrollcommand=vbar.set, xscrollcommand=hbar.set)
         vbar.config(command=lb.yview)
         hbar.config(command=lb.xview)
         vbar.pack(side="right", fill="y")
@@ -640,7 +644,7 @@ class DataEntryWindow(tk.Toplevel):
                     dlg.destroy()
         lb.bind('<Double-1>', on_double)
         # Buttons
-        btn_frame = ttk.Frame(dlg)
+        btn_frame = ttk.Frame(dlg, style="DataEntry.TFrame")
         btn_frame.pack(fill="x", padx=5, pady=5)
         def on_open():
             sel = lb.get(lb.curselection()[0])
@@ -651,8 +655,8 @@ class DataEntryWindow(tk.Toplevel):
                 dlg.destroy()
         def on_cancel():
             dlg.destroy()
-        ttk.Button(btn_frame, text="Open", command=on_open).pack(side="right", padx=5)
-        ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side="right")
+        ttk.Button(btn_frame, text="Open", command=on_open, style="DataEntry.TButton").pack(side="right", padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=on_cancel, style="DataEntry.TButton").pack(side="right")
         # Wait
         self.wait_window(dlg)
 
