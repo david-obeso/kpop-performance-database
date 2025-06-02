@@ -951,13 +951,11 @@ class DataEntryWindow(tk.Toplevel):
         # self.reset_form_fields() # Or handle reset based on source_type success
 
     def update_artists_from_spotify(self):
-        # Paths to your scripts
-        base_dir = os.path.dirname(__file__)
-        album_importer = os.path.join(base_dir, "accesories/spotify_data/spotify_album_importer.py")
-        artist_info_importer = os.path.join(base_dir, "accesories/spotify_data/spotify_artist_info_importer.py")
+        # Call the unified sync script in the main project directory
         try:
-            subprocess.run([sys.executable, album_importer], check=True)
-            subprocess.run([sys.executable, artist_info_importer], check=True)
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            update_script = os.path.join(base_dir, "spotify_update_from.py")
+            subprocess.run([sys.executable, update_script], check=True)
             self.load_initial_data()
             messagebox.showinfo("Artists Updated", "Artists have been updated and enriched from Spotify.", parent=self)
         except Exception as e:
