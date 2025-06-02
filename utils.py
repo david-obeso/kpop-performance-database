@@ -447,6 +447,22 @@ def show_file_browser(parent, initialdir=None, filetypes=None):
     hbar.pack(side='bottom', fill='x')
     lb.pack(side='left', fill='both', expand=True)
 
+    # --- DB: Get all used file_path1 values from performances and music_videos ---
+    import db_operations
+    used_file_paths = set()
+    try:
+        conn = db_operations.get_db_connection()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT file_path1 FROM performances WHERE file_path1 IS NOT NULL")
+            used_file_paths.update(row[0] for row in cursor.fetchall() if row[0])
+            cursor.execute("SELECT file_path1 FROM music_videos WHERE file_path1 IS NOT NULL")
+            used_file_paths.update(row[0] for row in cursor.fetchall() if row[0])
+    except Exception as e:
+        print(f"Error fetching used file paths: {e}")
+
+    show_only_new = tk.BooleanVar(value=False)
+
     # Populate function
     def populate():
         lb.delete(0, tk.END)
@@ -460,9 +476,22 @@ def show_file_browser(parent, initialdir=None, filetypes=None):
         for e in entries:
             path = os.path.join(d, e)
             if os.path.isdir(path) or any(e.lower().endswith(ext) for ext in exts):
-                lb.insert(tk.END, e + ('/' if os.path.isdir(path) else ''))
+                if show_only_new.get():
+                    # Only show files not in DB, always show directories
+                    if os.path.isdir(path) or path not in used_file_paths:
+                        lb.insert(tk.END, e + ('/' if os.path.isdir(path) else ''))
+                else:
+                    lb.insert(tk.END, e + ('/' if os.path.isdir(path) else ''))
+
     dir_var.trace_add('write', lambda *a: populate())
     populate()
+
+    # --- Add 'Show Only New' button ---
+    def toggle_show_only_new():
+        show_only_new.set(not show_only_new.get())
+        populate()
+    show_new_btn = ttk.Button(nav, text='Show Only New', command=toggle_show_only_new)
+    show_new_btn.pack(side='left', padx=8)
 
     # Selection handling
     selected = {'file': None}
