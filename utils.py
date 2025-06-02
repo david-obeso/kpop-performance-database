@@ -426,8 +426,13 @@ def show_file_browser(parent, initialdir=None, filetypes=None):
 
     # Directory path field
     dir_var = tk.StringVar(value=initialdir or os.getcwd())
-    entry = ttk.Entry(dlg, textvariable=dir_var, width=80)
-    entry.pack(fill='x', padx=5, pady=5)
+    entry = tk.Entry(
+        dlg, textvariable=dir_var, width=80,
+        bg=DARK_BG, fg=BRIGHT_FG, insertbackground=BRIGHT_FG,
+        relief='flat', font=("Courier New", 13, "bold"),
+        highlightthickness=1, highlightbackground=ACCENT, highlightcolor=ACCENT
+    )
+    entry.pack(fill='x', padx=10, pady=(12, 8))
 
     # Navigation frame
     nav = ttk.Frame(dlg)
