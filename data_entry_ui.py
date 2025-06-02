@@ -68,12 +68,14 @@ class DataEntryWindow(tk.Toplevel):
             selectforeground=BRIGHT_FG, 
             fieldbackground=DARK_BG,
             foreground=BRIGHT_FG,
-            arrowcolor=BRIGHT_FG
+            arrowcolor=BRIGHT_FG,
+            background=DARK_BG  # Ensure dropdown and arrow use dark background
         )
         style.map("DataEntry.TCombobox",
             fieldbackground=[('readonly', DARK_BG), ('!readonly', DARK_BG)],
             foreground=[('readonly', BRIGHT_FG), ('!readonly', BRIGHT_FG)],
-            arrowcolor=[('readonly', BRIGHT_FG)]
+            arrowcolor=[('readonly', BRIGHT_FG), ('!readonly', BRIGHT_FG)],
+            background=[('readonly', DARK_BG), ('!readonly', DARK_BG)]
         )
 
         main_frame = ttk.Frame(self, padding="20", style="DataEntry.TFrame")
@@ -131,7 +133,11 @@ class DataEntryWindow(tk.Toplevel):
 
         self.cancel_button = ttk.Button(button_frame, text="Cancel", command=self.close_window, style="DataEntry.TButton")
         self.cancel_button.pack(side=tk.RIGHT, padx=5)
-        
+
+        # Save Entry button, initially hidden
+        self.save_entry_button = ttk.Button(button_frame, text="Save Entry", command=self._attempt_save_local_entry, style="DataEntry.TButton")
+        # Do not pack yet; will be packed after Proceed
+
         self.protocol("WM_DELETE_WINDOW", self.close_window)
         self.load_initial_data() 
         self.focus_set()
@@ -499,12 +505,20 @@ class DataEntryWindow(tk.Toplevel):
         
         print(f"Proceeding with: Entry={entry_type}, Source={source_type}") # Keep for console feedback
 
+        # Hide Proceed button, show Save Entry button
+        self.proceed_button.pack_forget()
+        self.save_entry_button.pack(side=tk.RIGHT, padx=5)
+        self.cancel_button.pack_forget()
+        self.cancel_button.pack(side=tk.RIGHT, padx=5)
+
         if source_type == "url":
             item_name_display = entry_type.replace('_', ' ').title()
             self.build_url_entry_ui(item_name=item_name_display)
-            # Disable proceed since next step is Save/Confirm
+            self.save_entry_button.config(command=lambda: self.confirm_and_save_entry(entry_type, source_type="url"))
+            self.save_entry_button.pack(side=tk.RIGHT, padx=5)
+            self.cancel_button.pack(side=tk.RIGHT, padx=5)
+            self.proceed_button.pack_forget()
             self.proceed_button.config(state=tk.DISABLED)
-            
             if entry_type == "music_video":
                 if self._all_mv_url_fields_filled():
                     self._show_mv_url_confirmation_popup()
@@ -516,7 +530,10 @@ class DataEntryWindow(tk.Toplevel):
         elif source_type == "local_file":
             item_name_display = entry_type.replace('_', ' ').title()
             self.build_local_file_entry_ui(item_name=item_name_display)
-            # Disable proceed since Save Entry button handles saving
+            self.save_entry_button.config(command=self._attempt_save_local_entry)
+            self.save_entry_button.pack(side=tk.RIGHT, padx=5)
+            self.cancel_button.pack(side=tk.RIGHT, padx=5)
+            self.proceed_button.pack_forget()
             self.proceed_button.config(state=tk.DISABLED)
             return # Done with local file UI setup
 
@@ -646,13 +663,6 @@ class DataEntryWindow(tk.Toplevel):
         # --- Validation Message Label ---
         validation_label = ttk.Label(step_frame, textvariable=self.local_file_validation_label_var, foreground="red", style="DataEntry.TLabel", wraplength=700)
         validation_label.pack(pady=(5,0), anchor="w", padx=10)
-
-        # --- Save Button ---
-        save_button_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
-        save_button_frame.pack(fill="x", pady=(10,5), padx=10)
-        save_button = ttk.Button(save_button_frame, text="Save Entry", command=self._attempt_save_local_entry, style="DataEntry.TButton")
-        save_button.pack(side=tk.RIGHT, padx=5)
-
 
     def _validate_local_file_data(self):
         """Validates the data entered for a local file entry."""
