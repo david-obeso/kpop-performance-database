@@ -574,6 +574,87 @@ class DataEntryWindow(tk.Toplevel):
             return dt.strftime("%Y-%m-%d")
         except Exception:
             return None
+    
+    def _show_custom_file_dialog(self, initialdir, filetypes):
+        """Custom file browser Toplevel to allow resizing and easier navigation."""
+        # Parse extensions from filetypes
+        exts = []
+        for _, pattern in filetypes:
+            for token in pattern.split():
+                if token.startswith('*.'):
+                    exts.append(token[1:].lower())
+        # Setup dialog
+        dlg = tk.Toplevel(self)
+        dlg.title("Select Local Media File")
+        dlg.geometry("1200x800")
+        dlg.transient(self)
+        dlg.grab_set()
+        # Directory entry and Up button
+        dir_var = tk.StringVar(value=initialdir or os.getcwd())
+        path_entry = ttk.Entry(dlg, textvariable=dir_var, width=80)
+        path_entry.pack(fill="x", padx=5, pady=5)
+        nav_frame = ttk.Frame(dlg)
+        nav_frame.pack(fill="x", padx=5)
+        ttk.Button(nav_frame, text="Up", command=lambda: dir_var.set(os.path.dirname(dir_var.get()))).pack(side="left")
+        # File list
+        list_frame = ttk.Frame(dlg)
+        list_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        vbar = ttk.Scrollbar(list_frame, orient="vertical")
+        hbar = ttk.Scrollbar(list_frame, orient="horizontal")
+        lb = tk.Listbox(list_frame, yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+        vbar.config(command=lb.yview)
+        hbar.config(command=lb.xview)
+        vbar.pack(side="right", fill="y")
+        hbar.pack(side="bottom", fill="x")
+        lb.pack(side="left", fill="both", expand=True)
+        # Populate function
+        def populate():
+            lb.delete(0, tk.END)
+            d = dir_var.get()
+            try:
+                entries = os.listdir(d)
+            except Exception:
+                entries = []
+            entries.sort(key=str.lower)
+            # Parent up
+            lb.insert(tk.END, ".. (Up Directory)")
+            for e in entries:
+                path = os.path.join(d, e)
+                if os.path.isdir(path) or any(e.lower().endswith(ext) for ext in exts):
+                    lb.insert(tk.END, e + ("/" if os.path.isdir(path) else ""))
+        # Update populate on dir change
+        dir_var.trace_add('write', lambda *args: populate())
+        populate()
+        # On double click
+        def on_double(event):
+            sel = lb.get(lb.curselection()[0])
+            if sel == '.. (Up Directory)':
+                dir_var.set(os.path.dirname(dir_var.get()))
+            else:
+                name = sel.rstrip('/')
+                path = os.path.join(dir_var.get(), name)
+                if os.path.isdir(path):
+                    dir_var.set(path)
+                else:
+                    self.custom_file = path
+                    dlg.destroy()
+        lb.bind('<Double-1>', on_double)
+        # Buttons
+        btn_frame = ttk.Frame(dlg)
+        btn_frame.pack(fill="x", padx=5, pady=5)
+        def on_open():
+            sel = lb.get(lb.curselection()[0])
+            name = sel.rstrip('/')
+            path = os.path.join(dir_var.get(), name)
+            if os.path.isfile(path):
+                self.custom_file = path
+                dlg.destroy()
+        def on_cancel():
+            dlg.destroy()
+        ttk.Button(btn_frame, text="Open", command=on_open).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side="right")
+        # Wait
+        self.wait_window(dlg)
 
     def build_url_entry_ui(self, item_name):
         # content_area_frame is already cleared by handle_proceed
@@ -745,12 +826,20 @@ class DataEntryWindow(tk.Toplevel):
                     initial_dir = last
         except Exception:
             pass
-        filename = filedialog.askopenfilename(
-            title='Select Local Media File',
-            filetypes=filetypes,
-            parent=self,
-            initialdir=initial_dir
-        )
+        # Use custom dialog for larger browsing window
+        try:
+            self._show_custom_file_dialog(initial_dir, filetypes)
+            filename = getattr(self, 'custom_file', None)
+        except Exception:
+            filename = None
+        # Fallback to native if custom dialog not used or cancelled
+        if not filename:
+            filename = filedialog.askopenfilename(
+                title='Select Local Media File',
+                filetypes=filetypes,
+                parent=self,
+                initialdir=initial_dir
+            )
         # Only one file allowed
         if filename:
             # Save directory for next time
