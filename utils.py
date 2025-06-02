@@ -480,6 +480,42 @@ def show_file_browser(parent, initialdir=None, filetypes=None):
                 dlg.destroy()
     lb.bind('<Double-1>', on_double)
 
+    # Add right-click context menu for deleting files
+    def on_right_click(event):
+        try:
+            sel_idx = lb.nearest(event.y)
+            lb.selection_clear(0, tk.END)
+            lb.selection_set(sel_idx)
+            sel = lb.get(sel_idx)
+            if sel.startswith('..') or sel.endswith('/'):
+                return  # Don't allow deleting directories or parent
+            menu = tk.Menu(lb, tearoff=0)
+            def do_delete():
+                name = sel.rstrip('/')
+                path = os.path.join(dir_var.get(), name)
+                if os.path.isfile(path):
+                    confirm = tk.messagebox.askyesno(
+                        "Delete File",
+                        f"Are you sure you want to permanently delete this file?\n\n{path}\n\nThis action cannot be undone.",
+                        parent=dlg,
+                        icon='warning'
+                    )
+                    if confirm:
+                        try:
+                            os.remove(path)
+                            populate()
+                        except Exception as e:
+                            tk.messagebox.showerror(
+                                "Delete Failed",
+                                f"Could not delete file:\n{path}\n\nError: {e}",
+                                parent=dlg
+                            )
+            menu.add_command(label="Delete (Permanently)", command=do_delete)
+            menu.tk_popup(event.x_root, event.y_root)
+        except Exception:
+            pass
+    lb.bind('<Button-3>', on_right_click)
+
     # Buttons
     btns = ttk.Frame(dlg)
     btns.pack(fill='x', padx=5, pady=5)
