@@ -611,22 +611,40 @@ class DataEntryWindow(tk.Toplevel):
         step_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # --- Section for File Selection ---
-        file_selection_frame = ttk.LabelFrame(step_frame, text=f"A. Select Local File for {item_name}", style="DataEntry.TFrame", padding=10)
-        file_selection_frame.pack(fill="x", pady=5, anchor="n")
+        file_selection_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
+        file_selection_frame.pack(fill="x", pady=(10, 0), anchor="n")
 
-        browse_button = ttk.Button(file_selection_frame, text="Browse for File...", command=self.browse_local_files, style="DataEntry.TButton")
-        browse_button.pack(anchor="w", pady=(5,2), padx=2)
+        # Large, styled section label
+        file_section_label = tk.Label(
+            file_selection_frame, text="Select File", font=("Arial", 18, "bold"),
+            bg=DARK_BG, fg=BRIGHT_FG, pady=8, anchor="w"
+        )
+        file_section_label.pack(fill="x", padx=2, pady=(0, 8))
 
+        # File action buttons
+        button_row = ttk.Frame(file_selection_frame, style="DataEntry.TFrame")
+        button_row.pack(fill="x", pady=(0, 0))
+        browse_button = ttk.Button(button_row, text="Browse File", command=self.browse_local_files, style="DataEntry.TButton")
+        browse_button.pack(side=tk.LEFT, pady=(0,2), padx=(2, 2))
+        self.play_button = ttk.Button(button_row, text="Play File", command=self.play_selected_file, style="DataEntry.TButton", state=tk.DISABLED)
+        self.play_button.pack(side=tk.LEFT, padx=(8,2), pady=(0,2))
+
+        # File path entry directly below buttons
         selected_files_entry = ttk.Entry(file_selection_frame, textvariable=self.local_files_display_var, style="DataEntry.TEntry", state='readonly', width=80)
-        selected_files_entry.pack(anchor="w", pady=(2,5), fill="x", padx=2)
-        
+        selected_files_entry.pack(fill="x", padx=2, pady=(6, 10))
+
         # --- Common Details Section ---
-        details_frame = ttk.LabelFrame(step_frame, text="B. Enter Details", style="DataEntry.TFrame", padding=10)
-        details_frame.pack(fill="x", pady=10, anchor="n")
+        details_section_label = tk.Label(
+            step_frame, text="Enter Details", font=("Arial", 18, "bold"),
+            bg=DARK_BG, fg=BRIGHT_FG, pady=8, anchor="w"
+        )
+        details_section_label.pack(fill="x", padx=2, pady=(10, 8))
+        details_frame = ttk.Frame(step_frame, style="DataEntry.TFrame")
+        details_frame.pack(fill="x", pady=(0, 10), anchor="n")
         self._build_common_entry_details_ui(details_frame)
 
         # --- Validation Message Label ---
-        validation_label = ttk.Label(step_frame, textvariable=self.local_file_validation_label_var, foreground="red", style="DataEntry.TLabel", wraplength=700)
+        validation_label = ttk.Label(step_frame, textvariable=self.local_file_validation_label_var, foreground="red", style="DataEntry.TLabel", wraplength=700, bg=DARK_BG)
         validation_label.pack(pady=(5,0), anchor="w", padx=10)
 
         # --- Save Button ---
