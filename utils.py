@@ -198,6 +198,7 @@ def find_artist_in_filename(filepath, artist_list, detailed=False):
             if all_words_match:
                 # The longer the artist name (more words), the higher the confidence
                 score = 40 + min(len(words) * 5, 30)  # Cap at 70
+                
                 match_type = "words"
                 
                 # Bonus if the words appear close to each other
@@ -396,3 +397,103 @@ def find_song_in_filename(filepath, song_list, detailed=False):
     else:
         # Return just the highest scoring song
         return (matches[0][0], matches[0][1])
+
+def show_file_browser(parent, initialdir=None, filetypes=None):
+    # New dark-themed file browser implementation
+    import tkinter as tk
+    from tkinter import ttk
+    import os
+
+    DARK_BG = "#222222"
+    BRIGHT_FG = "#f8f8f2"
+    ACCENT = "#44475a"
+
+    # Determine extensions filter
+    exts = []
+    if filetypes:
+        for _, pattern in filetypes:
+            for token in pattern.split():
+                if token.startswith('*.'):
+                    exts.append(token[1:].lower())
+
+    # Build dialog
+    dlg = tk.Toplevel(parent)
+    dlg.title("Select Local Media File")
+    dlg.configure(bg=DARK_BG)
+    dlg.geometry("1200x800")
+    dlg.transient(parent)
+    dlg.grab_set()
+
+    # Directory path field
+    dir_var = tk.StringVar(value=initialdir or os.getcwd())
+    entry = ttk.Entry(dlg, textvariable=dir_var, width=80)
+    entry.pack(fill='x', padx=5, pady=5)
+
+    # Navigation frame
+    nav = ttk.Frame(dlg)
+    nav.pack(fill='x', padx=5)
+    ttk.Button(nav, text='Up', command=lambda: dir_var.set(os.path.dirname(dir_var.get()))).pack(side='left')
+
+    # File list
+    frame = ttk.Frame(dlg)
+    frame.pack(fill='both', expand=True, padx=5, pady=5)
+    vbar = ttk.Scrollbar(frame, orient='vertical')
+    hbar = ttk.Scrollbar(frame, orient='horizontal')
+    lb = tk.Listbox(frame, yscrollcommand=vbar.set, xscrollcommand=hbar.set,
+                    bg=DARK_BG, fg=BRIGHT_FG, selectbackground=ACCENT)
+    vbar.config(command=lb.yview)
+    hbar.config(command=lb.xview)
+    vbar.pack(side='right', fill='y')
+    hbar.pack(side='bottom', fill='x')
+    lb.pack(side='left', fill='both', expand=True)
+
+    # Populate function
+    def populate():
+        lb.delete(0, tk.END)
+        d = dir_var.get()
+        try:
+            entries = os.listdir(d)
+        except Exception:
+            entries = []
+        entries.sort(key=str.lower)
+        lb.insert(tk.END, '.. (Up Directory)')
+        for e in entries:
+            path = os.path.join(d, e)
+            if os.path.isdir(path) or any(e.lower().endswith(ext) for ext in exts):
+                lb.insert(tk.END, e + ('/' if os.path.isdir(path) else ''))
+    dir_var.trace_add('write', lambda *a: populate())
+    populate()
+
+    # Selection handling
+    selected = {'file': None}
+    def on_double(event):
+        sel = lb.get(lb.curselection()[0])
+        if sel.startswith('..'):
+            dir_var.set(os.path.dirname(dir_var.get()))
+        else:
+            name = sel.rstrip('/')
+            path = os.path.join(dir_var.get(), name)
+            if os.path.isdir(path):
+                dir_var.set(path)
+            else:
+                selected['file'] = path
+                dlg.destroy()
+    lb.bind('<Double-1>', on_double)
+
+    # Buttons
+    btns = ttk.Frame(dlg)
+    btns.pack(fill='x', padx=5, pady=5)
+    def do_open():
+        sel = lb.get(lb.curselection()[0]) if lb.curselection() else None
+        if sel and not sel.startswith('..'):
+            path = os.path.join(dir_var.get(), sel.rstrip('/'))
+            if os.path.isfile(path):
+                selected['file'] = path
+                dlg.destroy()
+    def do_cancel():
+        dlg.destroy()
+    ttk.Button(btns, text='Open', command=do_open).pack(side='right', padx=5)
+    ttk.Button(btns, text='Cancel', command=do_cancel).pack(side='right')
+
+    parent.wait_window(dlg)
+    return selected.get('file', None)
