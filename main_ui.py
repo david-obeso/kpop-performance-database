@@ -754,7 +754,7 @@ class KpopDBBrowser(tk.Tk):
                 msg = f"Accessing local: {first_basename} (1 of {num_local}). Waking drive..."
                 if app_instance.winfo_exists(): app_instance.after(0, lambda: app_instance.status_var.set(msg))
                 with open(first_local_file, "rb") as f: f.read(1)
-                mpv_proc = subprocess.Popen([config.MPV_PLAYER_PATH] + local_file_paths_list)
+                mpv_proc = subprocess.Popen([config.MPV_PLAYER_PATH, '--fs'] + local_file_paths_list)
                 mpv_played_count = num_local
                 if app_instance.winfo_exists():
                     status = f"Playing local: {first_basename}" if num_local == 1 else \
@@ -1051,30 +1051,7 @@ class KpopDBBrowser(tk.Tk):
             print(f"Other error during main window destroy: {e}")
 
 if __name__ == "__main__":
-    try:
-        mount_script_path = "/home/david/mount_windows_shares.sh" # Verify this path
-        if os.path.exists(mount_script_path):
-            process = subprocess.run(
-                [mount_script_path],
-                check=False, capture_output=True, text=True, timeout=15 
-            )
-            if process.returncode != 0:
-                error_message = f"Could not mount Windows shares!\nScript: {mount_script_path}\nOutput:\n{process.stdout}\n{process.stderr}\n\nThe program will now exit."
-                show_startup_error_and_exit("Mount Error", error_message)
-            print("Windows shares mounted (or already mounted).")
-        else:
-            error_message = f"Mount script '{mount_script_path}' not found.\nThe program will now exit."
-            show_startup_error_and_exit("Mount Error", error_message)
 
-    except FileNotFoundError:
-        error_message = f"Mount script '{mount_script_path}' not found (FileNotFoundError for subprocess).\nThe program will now exit."
-        show_startup_error_and_exit("Mount Error", error_message)
-    except subprocess.TimeoutExpired:
-        error_message = "Mount script timed out after 15 seconds.\nThe program will now exit."
-        show_startup_error_and_exit("Mount Error", error_message)
-    except Exception as e: 
-        error_message = f"An unexpected error occurred during mounting: {e}\nThe program will now exit."
-        show_startup_error_and_exit("Mount Error", error_message)
     
     try:
         app = KpopDBBrowser() 

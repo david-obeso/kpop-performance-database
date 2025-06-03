@@ -1435,7 +1435,7 @@ class DataEntryWindow(tk.Toplevel):
             # Warm up drive by reading first byte
             with open(file_path, 'rb') as f:
                 f.read(1)
-            subprocess.Popen([config.MPV_PLAYER_PATH, file_path])
+            subprocess.Popen([config.MPV_PLAYER_PATH, '--fs', file_path])
         except Exception as e:
             try:
                 webbrowser.open_new(file_path)
