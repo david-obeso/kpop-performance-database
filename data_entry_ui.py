@@ -22,23 +22,28 @@ import utils  # For extract_date_from_filepath
 DARK_BG = "#222222"
 BRIGHT_FG = "#f8f8f2"
 ACCENT = "#44475a"
-FONT_MAIN = ("Courier New", 13)
-FONT_HEADER = ("Courier New", 13, "bold")
-FONT_BUTTON = ("Arial", 13, "bold")
-FONT_ENTRY_DATA_UI = ("Courier New", 13)
+FONT_MAIN = ("Courier New", 15)
+FONT_HEADER = ("Courier New", 15, "bold")
+FONT_BUTTON = ("Arial", 15, "bold")
+FONT_ENTRY_DATA_UI = ("Courier New", 15)
 
 
 class DataEntryWindow(tk.Toplevel):
     def __init__(self, master, db_ops): 
         super().__init__(master)
-        self.title("Add Database Entry")  # Simplify window title
-        self.geometry("900x1050")  # Increased height
+        self.title("Add Database Entry")
+        self.geometry("900x1050")
         self.configure(bg=DARK_BG)
         self.transient(master)
         self.grab_set()
 
         self.master_app = master
-        self.db_ops = db_ops 
+        self.db_ops = db_ops
+
+        # Create radiobutton images
+        self.radio_unchecked_img, self.radio_checked_img = self._create_radiobutton_images(size=24, indicator_size_ratio=0.5)
+        self.entry_type_radios = [] # To store entry type radio buttons
+        self.source_type_radios = [] # To store source type radio buttons
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -47,10 +52,9 @@ class DataEntryWindow(tk.Toplevel):
         style.configure("DataEntry.TLabelframe.Label", background=DARK_BG, foreground=BRIGHT_FG, font=("Courier New", 15, "bold"))
         style.configure("DataEntry.TLabelframe", background=DARK_BG)
         style.configure("DataEntry.TRadiobutton", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN,
-                        indicatorrelief=tk.FLAT, indicatormargin=5, indicatordiameter=15, indicatorpadding=8)
+                        relief=tk.FLAT, padding=(10, 5)) # Removed indicator-specific options, added padding
         style.map("DataEntry.TRadiobutton",
-                  indicatorcolor=[('selected', ACCENT), ('!selected', '#555555')],
-                  background=[('active', DARK_BG)])
+                  background=[('active', DARK_BG)]) # Removed indicatorcolor mapping
         style.configure("DataEntry.TButton", background=ACCENT, foreground=BRIGHT_FG, font=FONT_BUTTON)
         style.map("DataEntry.TButton", background=[("active", "#6272a4")])
         style.configure("DataEntry.TEntry", fieldbackground=DARK_BG, foreground=BRIGHT_FG, 
@@ -93,17 +97,41 @@ class DataEntryWindow(tk.Toplevel):
 
         type_frame = ttk.LabelFrame(selection_outer_frame, text="Entry Type", style="DataEntry.TLabelframe", padding=(10, 8))
         type_frame.pack(pady=5, fill="x")
-        ttk.Radiobutton(type_frame, text="Performance", variable=self.entry_type_var,
-                        value="performance", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=20, pady=10)
-        ttk.Radiobutton(type_frame, text="Music Video", variable=self.entry_type_var,
-                        value="music_video", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=20, pady=10)
+
+        rb_perf = ttk.Radiobutton(type_frame, text="Performance", variable=self.entry_type_var,
+                        value="performance", style="DataEntry.TRadiobutton", 
+                        image=self.radio_unchecked_img, compound='left')
+        rb_perf.config(command=lambda: (self.reset_content_on_selection_change(), self._update_radio_button_images(self.entry_type_var, self.entry_type_radios)))
+        rb_perf.pack(side=tk.LEFT, padx=20, pady=10)
+        self.entry_type_radios.append(rb_perf)
+
+        rb_mv = ttk.Radiobutton(type_frame, text="Music Video", variable=self.entry_type_var,
+                        value="music_video", style="DataEntry.TRadiobutton",
+                        image=self.radio_unchecked_img, compound='left')
+        rb_mv.config(command=lambda: (self.reset_content_on_selection_change(), self._update_radio_button_images(self.entry_type_var, self.entry_type_radios)))
+        rb_mv.pack(side=tk.LEFT, padx=20, pady=10)
+        self.entry_type_radios.append(rb_mv)
+        
+        self._update_radio_button_images(self.entry_type_var, self.entry_type_radios) # Initial image update
 
         source_frame = ttk.LabelFrame(selection_outer_frame, text="Source Type", style="DataEntry.TLabelframe", padding=(10, 8))
         source_frame.pack(pady=5, fill="x")
-        ttk.Radiobutton(source_frame, text="URL", variable=self.source_type_var,
-                        value="url", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=20, pady=10)
-        ttk.Radiobutton(source_frame, text="Local File", variable=self.source_type_var,
-                        value="local_file", style="DataEntry.TRadiobutton", command=self.reset_content_on_selection_change).pack(side=tk.LEFT, padx=20, pady=10)
+
+        rb_url = ttk.Radiobutton(source_frame, text="URL", variable=self.source_type_var,
+                        value="url", style="DataEntry.TRadiobutton",
+                        image=self.radio_unchecked_img, compound='left')
+        rb_url.config(command=lambda: (self.reset_content_on_selection_change(), self._update_radio_button_images(self.source_type_var, self.source_type_radios)))
+        rb_url.pack(side=tk.LEFT, padx=20, pady=10)
+        self.source_type_radios.append(rb_url)
+
+        rb_local = ttk.Radiobutton(source_frame, text="Local File", variable=self.source_type_var,
+                        value="local_file", style="DataEntry.TRadiobutton",
+                        image=self.radio_unchecked_img, compound='left')
+        rb_local.config(command=lambda: (self.reset_content_on_selection_change(), self._update_radio_button_images(self.source_type_var, self.source_type_radios)))
+        rb_local.pack(side=tk.LEFT, padx=20, pady=10)
+        self.source_type_radios.append(rb_local)
+
+        self._update_radio_button_images(self.source_type_var, self.source_type_radios) # Initial image update
         
         # details area without framing label
         self.content_area_frame = ttk.Frame(main_frame, style="DataEntry.TFrame")
@@ -148,6 +176,63 @@ class DataEntryWindow(tk.Toplevel):
         self.show_type_choices = []
         self.resolution_choices = []
         self._load_showtype_and_resolution_choices()
+
+    def _update_radio_button_images(self, group_variable, radio_buttons):
+        """Updates the images for a group of radio buttons based on the variable's state."""
+        current_value = group_variable.get()
+        for rb in radio_buttons:
+            rb_value = rb.cget("value") 
+            if rb_value == current_value:
+                rb.config(image=self.radio_checked_img)
+            else:
+                rb.config(image=self.radio_unchecked_img)
+
+    def _create_radiobutton_images(self, size=24, indicator_size_ratio=0.5, border_width=2):
+        """Creates custom images for radio button indicators."""
+        from tkinter import PhotoImage
+        
+        fg_color = BRIGHT_FG
+        bg_color = DARK_BG
+        accent_color = ACCENT
+        
+        # Unchecked image (empty circle)
+        unchecked_img = PhotoImage(width=size, height=size)
+        unchecked_img.put(bg_color, to=(0, 0, size, size)) # Fill background
+
+        center_x, center_y = size // 2, size // 2
+        radius = (size // 2) - border_width
+
+        for x in range(size):
+            for y in range(size):
+                dist_sq = (x - center_x)**2 + (y - center_y)**2
+                # Draw outer border (slightly thicker)
+                if radius**2 <= dist_sq < (radius + border_width)**2 :
+                    unchecked_img.put(fg_color, (x, y))
+                # Fill inside with background for truly empty circle
+                elif dist_sq < radius**2:
+                     unchecked_img.put(bg_color, (x,y))
+
+
+        # Checked image (circle with smaller filled circle)
+        checked_img = PhotoImage(width=size, height=size)
+        checked_img.put(bg_color, to=(0, 0, size, size)) # Fill background
+        
+        indicator_radius = int(radius * indicator_size_ratio)
+
+        for x in range(size):
+            for y in range(size):
+                dist_sq = (x - center_x)**2 + (y - center_y)**2
+                # Draw outer border
+                if radius**2 <= dist_sq < (radius + border_width)**2:
+                    checked_img.put(fg_color, (x, y))
+                # Draw inner filled circle (indicator)
+                elif dist_sq < indicator_radius**2:
+                    checked_img.put(fg_color, (x, y))
+                # Fill space between inner circle and outer border with background
+                elif indicator_radius**2 <= dist_sq < radius**2:
+                    checked_img.put(bg_color, (x,y))
+
+        return unchecked_img, checked_img
 
     def load_initial_data(self):
         self.all_artists_list = self.db_ops.get_all_artists()
@@ -1258,19 +1343,27 @@ class DataEntryWindow(tk.Toplevel):
             selected_titles = set()  # Use a set to avoid duplicates
             for song_id, song_title, score, match_type in high_confidence_matches[:3]:  # Limit to top 3
                 if song_title not in selected_titles:  # Avoid duplicates
-                    self.selected_song_ids.append(song_id)
-                    self.selected_song_titles.append(song_title)
+                    rb = ttk.Radiobutton(self.matches_frame, text=f"{song_title} (Score: {score:.2f}, Type: {match_type})",
+                                          variable=self.selected_song_var, value=song_id, style="DataEntry.TRadiobutton")
+                    rb.pack(anchor="w", padx=10, pady=2)
                     selected_titles.add(song_title)
             
-            if self.selected_song_titles:
-                print(f"Auto-selected songs from filename: {', '.join(self.selected_song_titles)}")
-                # Update the title field based on the selected songs
-                self.update_title_from_songs()
-                
-                # Refresh the UI to show selected songs
-                # This will happen in handle_proceed later
-        else:
-            print("No high confidence song matches found")
+            # If there are still no selections, fall back to low confidence matches
+            if not selected_titles:
+                low_confidence_matches = [match for match in song_matches if match[2] < 70]
+                for song_id, song_title, score, match_type in low_confidence_matches[:3]:  # Limit to top 3
+                    if song_title not in selected_titles:  # Avoid duplicates
+                        rb = ttk.Radiobutton(self.matches_frame, text=f"{song_title} (Score: {score:.2f}, Type: {match_type})",
+                                              variable=self.selected_song_var, value=song_id, style="DataEntry.TRadiobutton")
+                        rb.pack(anchor="w", padx=10, pady=2)
+                        selected_titles.add(song_title)
+        
+        # If still no matches, show a message
+        if not selected_titles:
+            ttk.Label(self.matches_frame, text="No song matches found in filename.", style="DataEntry.TLabel", foreground="red").pack(anchor="w", padx=10, pady=2)
+
+        # Enable the save button if there are any matches
+        self.save_entry_button.config(state=tk.NORMAL)
 
     def remove_selected_song(self, idx):
         title_to_remove = self.selected_song_titles[idx]
@@ -1385,6 +1478,7 @@ class DataEntryWindow(tk.Toplevel):
 
             # Prepare data and insert into DB for local file entries
             raw_date = date_yyyymmdd
+           
             formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
             perf_date = formatted_date if formatted_date else raw_date
             # Build artist names list
