@@ -467,7 +467,7 @@ def show_file_browser(parent, initialdir=None, filetypes=None):
     except Exception as e:
         print(f"Error fetching used file paths: {e}")
 
-    show_only_new = tk.BooleanVar(value=False)
+    show_only_new = tk.BooleanVar(value=True)  # Changed to True for default on
 
     # Populate function
     def populate():
@@ -495,8 +495,14 @@ def show_file_browser(parent, initialdir=None, filetypes=None):
     # --- Add 'Show Only New' button ---
     def toggle_show_only_new():
         show_only_new.set(not show_only_new.get())
-        populate()
-    show_new_btn = ttk.Button(nav, text='Show Only New', command=toggle_show_only_new)
+        # Update button text based on current state
+        if show_only_new.get():
+            show_new_btn.config(text='Show Only New (ON)')
+        else:
+            show_new_btn.config(text='Show Only New (OFF)')
+        populate()  # This line should already be there - if not, this fixes it
+    
+    show_new_btn = ttk.Button(nav, text='Show Only New (ON)', command=toggle_show_only_new)
     show_new_btn.pack(side='left', padx=8)
 
     # Selection handling
