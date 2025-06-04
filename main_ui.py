@@ -364,14 +364,14 @@ class KpopDBBrowser(tk.Tk):
         self.filter_4k_var = tk.BooleanVar(value=False)
         filter_4k_checkbutton = tk.Checkbutton(filter_frame, variable=self.filter_4k_var,
                                                text="4K", command=lambda: self.update_list(apply_current_sort=True),
-                                               font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, padx=8, pady=4,
+                                               font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, selectcolor=DARK_BG, padx=8, pady=4,
                                                image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         filter_4k_checkbutton.pack(side="left", padx=(15, 10))
 
         # New records only (score 0 or None)
         self.new_checkbox = tk.Checkbutton(filter_frame, text="New", variable=self.show_new_var, 
                                            command=lambda: self.update_list(apply_current_sort=True),
-                                           font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, padx=8, pady=4,
+                                           font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, selectcolor=DARK_BG, padx=8, pady=4,
                                            image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         self.new_checkbox.pack(side="left", padx=(2, 10))
         
@@ -509,7 +509,7 @@ class KpopDBBrowser(tk.Tk):
         self.random_count_dropdown.pack(side="left")
         
         self.change_score_checkbox = tk.Checkbutton(play_controls_frame, text="Change Score After Play", variable=self.change_score_var,
-                                                    font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, padx=8, pady=4,
+                                                    font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, selectcolor=DARK_BG, padx=8, pady=4,
                                                     image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         self.change_score_checkbox.pack(side="left", padx=(20, 0))
 
