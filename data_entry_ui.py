@@ -52,9 +52,17 @@ class DataEntryWindow(tk.Toplevel):
         style.configure("DataEntry.TLabelframe.Label", background=DARK_BG, foreground=BRIGHT_FG, font=("Courier New", 15, "bold"))
         style.configure("DataEntry.TLabelframe", background=DARK_BG)
         style.configure("DataEntry.TRadiobutton", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN,
-                        relief=tk.FLAT, padding=(10, 5)) # Removed indicator-specific options, added padding
+                        relief=tk.FLAT, padding=(10, 5))
         style.map("DataEntry.TRadiobutton",
-                  background=[('active', DARK_BG)]) # Removed indicatorcolor mapping
+                  background=[('active', DARK_BG)])
+        # Override layout to remove the default small indicator circle
+        style.layout("DataEntry.TRadiobutton", [
+            ('Radiobutton.padding', {'sticky':'nswe','children':[
+                ('Radiobutton.focus', {'sticky':'nswe','children':[
+                    ('Radiobutton.label', {'sticky':'nswe'})
+                ]})
+            ]})
+        ])
         style.configure("DataEntry.TButton", background=ACCENT, foreground=BRIGHT_FG, font=FONT_BUTTON)
         style.map("DataEntry.TButton", background=[("active", "#6272a4")])
         style.configure("DataEntry.TEntry", fieldbackground=DARK_BG, foreground=BRIGHT_FG, 
@@ -1478,7 +1486,6 @@ class DataEntryWindow(tk.Toplevel):
 
             # Prepare data and insert into DB for local file entries
             raw_date = date_yyyymmdd
-           
             formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
             perf_date = formatted_date if formatted_date else raw_date
             # Build artist names list

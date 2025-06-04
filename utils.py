@@ -445,6 +445,7 @@ def show_file_browser(parent, initialdir=None, filetypes=None):
     vbar = ttk.Scrollbar(frame, orient='vertical')
     hbar = ttk.Scrollbar(frame, orient='horizontal')
     lb = tk.Listbox(frame, yscrollcommand=vbar.set, xscrollcommand=hbar.set,
+                    font=("Courier New", 15),
                     bg=DARK_BG, fg=BRIGHT_FG, selectbackground=ACCENT)
     vbar.config(command=lb.yview)
     hbar.config(command=lb.xview)
