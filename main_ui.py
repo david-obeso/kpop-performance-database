@@ -22,19 +22,31 @@ import modify_entry_ui  # For the modify-entry window
 DARK_BG = "#222222"
 BRIGHT_FG = "#f8f8f2"
 ACCENT = "#44475a"
-FONT_MAIN = ("Courier New", 13)
-FONT_HEADER = ("Courier New", 13, "bold")
-FONT_LABEL_SMALL = ("Courier New", 11)
-FONT_STATUS = ("Arial", 13)
-FONT_BUTTON = ("Arial", 13, "bold")
+# Scale factor for UI
+UI_SCALE = 1.42
+# Scale factor for font size only
+FONT_SCALE = 1.5  # 50% larger than original
 
-APP_VERSION = "4.0.2 (Data Entry UI - Phase 1)" # Updated version
+def scale_font(font_tuple):
+    # font_tuple: (family, size, *modifiers)
+    family = font_tuple[0]
+    size = int(font_tuple[1] * FONT_SCALE)
+    modifiers = font_tuple[2:] if len(font_tuple) > 2 else []
+    return (family, size, *modifiers)
+
+FONT_MAIN = scale_font(("Courier New", 13))
+FONT_HEADER = scale_font(("Courier New", 13, "bold"))
+FONT_LABEL_SMALL = scale_font(("Courier New", 11))
+FONT_STATUS = scale_font(("Arial", 13))
+FONT_BUTTON = scale_font(("Arial", 13, "bold"))
+
+APP_VERSION = "4.0.2 (Data Entry UI - Phase 1, fonts +15%)" # Updated version
 
 class ScoreEditorWindow(tk.Toplevel): # Keep this class definition as it was
     def __init__(self, master, title, performance_details_list_dicts, db_connection, refresh_callback):
         super().__init__(master)
         self.title(title)
-        self.geometry("950x720") 
+        self.geometry(f"{int(950*UI_SCALE)}x{int(720*UI_SCALE)}") 
         self.configure(bg=DARK_BG)
         self.transient(master)
         self.grab_set()
@@ -208,7 +220,9 @@ class KpopDBBrowser(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"K-Pop Performance Database Browser v{APP_VERSION}") 
-        self.geometry("2560x950") 
+        # Scale window size
+        base_width, base_height = 2560, 1200
+        self.geometry(f"{int(base_width*UI_SCALE)}x{int(base_height*UI_SCALE)}")
         self.configure(bg=DARK_BG)
 
         self.option_add('*TCombobox*Listbox.background', '#333a40') 
@@ -257,7 +271,7 @@ class KpopDBBrowser(tk.Tk):
                   background=[("active", "#6272a4"), ("disabled", "#303030")],
                   foreground=[("disabled", "#888888")] 
         )
-        style.configure("Custom.TCombobox", font=("Courier New", 16, "bold"), selectbackground=ACCENT, selectforeground=BRIGHT_FG)
+        style.configure("Custom.TCombobox", font=scale_font(("Courier New", 16, "bold")), selectbackground=ACCENT, selectforeground=BRIGHT_FG)
         style.map("Custom.TCombobox",
             fieldbackground=[('readonly', '#333a40'), ('disabled', '#2a2a2a')],
             foreground=[('readonly', BRIGHT_FG), ('disabled', '#777777')],
@@ -277,7 +291,7 @@ class KpopDBBrowser(tk.Tk):
         self.artist_var = tk.StringVar()
         self.artist_dropdown = ttk.Combobox(filter_frame, textvariable=self.artist_var,
                                            state="readonly", style="Custom.TCombobox",
-                                           width=40)
+                                           width=int(40*UI_SCALE))
         self.artist_dropdown.pack(side="left", padx=5, ipadx=5, ipady=6)
         self.artist_dropdown.bind("<<ComboboxSelected>>", lambda e: self.update_list(apply_current_sort=True))
         # Enable keyboard navigation: jump to artist starting with typed letter
@@ -285,7 +299,7 @@ class KpopDBBrowser(tk.Tk):
         
         ttk.Label(filter_frame, text="Date (YYYY or YYYY-MM):").pack(side="left", padx=(15,0))
         self.date_var = tk.StringVar()
-        date_entry = tk.Entry(filter_frame, textvariable=self.date_var, width=10, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, insertbackground=BRIGHT_FG)
+        date_entry = tk.Entry(filter_frame, textvariable=self.date_var, width=int(10*UI_SCALE), font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, insertbackground=BRIGHT_FG)
         date_entry.pack(side="left", padx=5, ipadx=5, ipady=3); date_entry.bind("<KeyRelease>", lambda e: self.update_list(apply_current_sort=True))
         
         # 4K filter: checkbox with label on the right
@@ -316,7 +330,7 @@ class KpopDBBrowser(tk.Tk):
             {"name": "Artist(s)", "width": 32, "key": "artists_str"},
             {"name": "Title", "width": 86, "key": "db_title"},
             {"name": "Show Type", "width": 20, "key": "show_type"},
-            {"name": "Res", "width": 9, "key": "resolution"},
+            {"name": "Res", "width": 7, "key": "resolution"},
             {"name": "Score", "width": 6, "key": "score"},
             {"name": "Source", "width": 10, "key": "source"}
         ]
@@ -361,7 +375,8 @@ class KpopDBBrowser(tk.Tk):
 
         self.listbox = tk.Listbox(listbox_frame, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG,
             selectbackground="#44475a", selectforeground="#f1fa8c", highlightbackground=ACCENT, highlightcolor=ACCENT,
-            activestyle="none", relief="flat", borderwidth=0, selectmode=tk.EXTENDED)
+            activestyle="none", relief="flat", borderwidth=0, selectmode=tk.EXTENDED,
+            height=int(25*UI_SCALE))
         
         vscroll = ttk.Scrollbar(listbox_frame, orient="vertical", style="Vertical.TScrollbar", command=self.listbox.yview) 
         hscroll = ttk.Scrollbar(listbox_frame, orient="horizontal", style="Horizontal.TScrollbar", command=self.listbox.xview)
@@ -411,7 +426,7 @@ class KpopDBBrowser(tk.Tk):
         self.random_count_dropdown = ttk.Combobox(
             play_controls_frame, textvariable=self.random_count_var,
             values=["1", "2", "3", "5", "10", "All"], state="readonly",
-            width=5, style="Custom.TCombobox"
+            width=int(5*UI_SCALE), style="Custom.TCombobox"
         )
         self.random_count_dropdown.pack(side="left")
         
@@ -419,8 +434,8 @@ class KpopDBBrowser(tk.Tk):
         self.change_score_checkbox.pack(side="left", padx=(20, 0))
 
         # Status bar (packed last to ensure it's at the very bottom)
-        status_font = ("Arial", 16, "bold") 
-        status = tk.Label(self, textvariable=self.status_var, relief="sunken", anchor="w", font=status_font, bg=ACCENT, fg=BRIGHT_FG, padx=8, pady=6)
+        status_font = scale_font(("Arial", 16, "bold")) 
+        status = tk.Label(self, textvariable=self.status_var, relief="sunken", anchor="w", font=status_font, bg=ACCENT, fg=BRIGHT_FG, padx=int(8*UI_SCALE), pady=int(6*UI_SCALE))
         status.pack(fill="x", side="bottom")
         self.status_var.set("Ready.")
 
@@ -815,9 +830,9 @@ class KpopDBBrowser(tk.Tk):
 
     def show_played_info_window(self, played_details_dicts):
         if not played_details_dicts: return
-        info_win = tk.Toplevel(self); info_win.title("Played Performance Details"); info_win.geometry("800x500") 
+        info_win = tk.Toplevel(self); info_win.title("Played Performance Details"); info_win.geometry(f"{int(800*UI_SCALE)}x{int(500*UI_SCALE)}") 
         info_win.configure(bg=DARK_BG); info_win.transient(self); info_win.grab_set()
-        txt_frame = ttk.Frame(info_win); txt_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10,0))
+        txt_frame = ttk.Frame(info_win); txt_frame.pack(fill=tk.BOTH, expand=True, padx=int(10*UI_SCALE), pady=(int(10*UI_SCALE),0))
         txt_area = tk.Text(txt_frame, wrap=tk.WORD, font=FONT_MAIN, bg=DARK_BG, fg=BRIGHT_FG, relief="flat", borderwidth=0,
                             selectbackground="#44475a", selectforeground="#f1fa8c", insertbackground=BRIGHT_FG)
         vscroll = ttk.Scrollbar(txt_frame, orient="vertical", command=txt_area.yview, style="Vertical.TScrollbar")
@@ -843,7 +858,7 @@ class KpopDBBrowser(tk.Tk):
             txt_area.insert(tk.END, f"   Score: {score}\n")
             txt_area.insert(tk.END, f"   Source: {path_info}\n\n")
         txt_area.config(state=tk.DISABLED)
-        ttk.Button(info_win, text="Close", command=info_win.destroy).pack(pady=10)
+        ttk.Button(info_win, text="Close", command=info_win.destroy).pack(pady=int(10*UI_SCALE))
         info_win.focus_set()
 
     def open_score_editor(self, played_performance_details_dicts, is_random_source=False):
