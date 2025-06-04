@@ -247,6 +247,46 @@ class DataEntryWindow(tk.Toplevel):
         # Sort the list of dicts by 'name', case-insensitive
         self.all_artists_list = sorted(self.all_artists_list, key=lambda a: a['name'].lower())
 
+    def reset_form_fields(self):
+        """Reset all form fields to prepare for a new entry"""
+        # Clear all primary form variables
+        self.url_entry_var.set("")
+        self.primary_artist_var.set("")
+        self.secondary_artist_var.set("")
+        self.title_var.set("")
+        self.date_var.set("")
+        
+        # Clear song selections
+        self.selected_song_ids = []
+        self.selected_song_titles = []
+        
+        # Clear local file selections
+        self.selected_local_files = []
+        self.local_files_display_var.set("No files selected.")
+        self.local_file_validation_label_var.set("")
+        
+        # Clear show type and resolution for performances (if they exist)
+        if hasattr(self, 'show_type_var'):
+            self.show_type_var.set("")
+        if hasattr(self, 'resolution_var'):
+            self.resolution_var.set("")
+        
+        # Reset UI to initial state
+        for widget in self.content_area_frame.winfo_children():
+            widget.destroy()
+        self.current_content_placeholder_label = ttk.Label(
+            self.content_area_frame,
+            text="Select options above and click 'Proceed / Next Step'.",
+            style="DataEntry.TLabel"
+        )
+        self.current_content_placeholder_label.pack(padx=10, pady=20, anchor="center")
+        
+        # Reset buttons to initial state
+        self.proceed_button.config(state=tk.NORMAL)
+        self.proceed_button.pack(side=tk.RIGHT, padx=5)
+        self.save_entry_button.pack_forget()
+        self.cancel_button.pack(side=tk.RIGHT, padx=5)
+
     def _load_showtype_and_resolution_choices(self):
         # Query the DB for all unique show_type and resolution values
         try:
@@ -830,8 +870,8 @@ class DataEntryWindow(tk.Toplevel):
                 # Refresh main window list
                 self.master_app.load_performances()
                 self.master_app.update_list()
-                # Close window after successful save
-                self.close_window()
+                # Reset form for next entry instead of closing window
+                self.reset_form_fields()
                 return
             else:
                 self.db_ops.insert_music_video(title=self.title_var.get().strip(), release_date=perf_date,
@@ -842,8 +882,8 @@ class DataEntryWindow(tk.Toplevel):
                 # Refresh main window list
                 self.master_app.load_performances()
                 self.master_app.update_list()
-                # Close window after successful save
-                self.close_window()
+                # Reset form for next entry instead of closing window
+                self.reset_form_fields()
                 return
 
         # If validation fails, the message is already set by _validate_local_file_data
@@ -1026,8 +1066,8 @@ class DataEntryWindow(tk.Toplevel):
                 # Refresh main window list
                 self.master_app.load_performances()
                 self.master_app.update_list()
-                # Close window after successful save
-                self.close_window()
+                # Reset form for next entry instead of closing window
+                self.reset_form_fields()
                 return
             else:
                 self.db_ops.insert_music_video(title=title, release_date=perf_date,
@@ -1038,8 +1078,8 @@ class DataEntryWindow(tk.Toplevel):
                 # Refresh main window list
                 self.master_app.load_performances()
                 self.master_app.update_list()
-                # Close window after successful save
-                self.close_window()
+                # Reset form for next entry instead of closing window
+                self.reset_form_fields()
                 return
 
         else:
@@ -1451,7 +1491,7 @@ class DataEntryWindow(tk.Toplevel):
             # --- DB-duplication checks ---
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
-            # 1. Ensure selected file is not already in DB
+            #  1. Ensure selected file is not already in DB
             if file_path1:
                 table = 'performances' if entry_type == 'performance' else 'music_videos'
                 query = f"SELECT 1 FROM {table} WHERE file_path1 = ?"
@@ -1503,8 +1543,8 @@ class DataEntryWindow(tk.Toplevel):
                 # Refresh main window list
                 self.master_app.load_performances()
                 self.master_app.update_list()
-                # Close window after successful save
-                self.close_window()
+                # Reset form for next entry instead of closing window
+                self.reset_form_fields()
                 return
             else:
                 self.db_ops.insert_music_video(title=title, release_date=perf_date,
@@ -1515,8 +1555,8 @@ class DataEntryWindow(tk.Toplevel):
                 # Refresh main window list
                 self.master_app.load_performances()
                 self.master_app.update_list()
-                # Close window after successful save
-                self.close_window()
+                # Reset form for next entry instead of closing window
+                self.reset_form_fields()
                 return
 
         else:
