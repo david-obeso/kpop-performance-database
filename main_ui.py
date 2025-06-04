@@ -182,8 +182,21 @@ class ScoreEditorWindow(tk.Toplevel): # Keep this class definition as it was
             cursor = self.db_conn.cursor()
             for item_data in self.performance_items_data:
                 if item_data["score_var"].get() != item_data["original_score"]:
-                    cursor.execute("UPDATE performances SET score = ? WHERE performance_id = ?", 
-                                   (item_data["score_var"].get(), item_data["id"]))
+                    item_id = item_data["id"]
+                    new_score = item_data["score_var"].get()
+                    
+                    # Check if this is a music video (ID starts with "mv_") or a performance
+                    if str(item_id).startswith("mv_"):
+                        # Extract the actual mv_id by removing the "mv_" prefix
+                        mv_id = str(item_id)[3:]  # Remove "mv_" prefix
+                        cursor.execute("UPDATE music_videos SET score = ? WHERE mv_id = ?", 
+                                       (new_score, mv_id))
+                        print(f"Updated music video score: mv_id={mv_id}, score={new_score}")
+                    else:
+                        # Regular performance record
+                        cursor.execute("UPDATE performances SET score = ? WHERE performance_id = ?", 
+                                       (new_score, item_id))
+                        print(f"Updated performance score: performance_id={item_id}, score={new_score}")
                     updates_made += 1
             if updates_made > 0: 
                 self.db_conn.commit()
