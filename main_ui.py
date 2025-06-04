@@ -1132,6 +1132,16 @@ class KpopDBBrowser(tk.Tk):
     
     
     def on_closing(self): 
+        # Unmount drives at exit
+        unmount_script = os.path.expanduser("./unmount_kpop_drives.sh")
+        try:
+            unmount_res = subprocess.run(['sudo', unmount_script], capture_output=True, text=True)
+            if unmount_res.returncode == 0:
+                messagebox.showinfo("Unmount Drives", "K-Pop drives unmounted successfully.")
+            else:
+                messagebox.showerror("Unmount Drives Error", f"Unmount script failed:\n{unmount_res.stderr}")
+        except Exception as unmount_exc:
+            messagebox.showerror("Unmount Drives Exception", f"Error running unmount script: {unmount_exc}")
         if self.score_editor_window and self.score_editor_window.winfo_exists():
             self.score_editor_window.cancel() 
             if self.score_editor_window and self.score_editor_window.winfo_exists():
@@ -1152,9 +1162,17 @@ class KpopDBBrowser(tk.Tk):
             print(f"Other error during main window destroy: {e}")
 
 if __name__ == "__main__":
-
-    
     try:
+        # Mount drives at startup
+        mount_script = os.path.expanduser("./mount_kpop_drives.sh")
+        try:
+            mount_res = subprocess.run(['sudo', mount_script], capture_output=True, text=True)
+            if mount_res.returncode == 0:
+                messagebox.showinfo("Mount Drives", "K-Pop drives mounted successfully.")
+            else:
+                messagebox.showerror("Mount Drives Error", f"Mount script failed:\n{mount_res.stderr}")
+        except Exception as mount_exc:
+            messagebox.showerror("Mount Drives Exception", f"Error running mount script: {mount_exc}")
         app = KpopDBBrowser() 
         app.protocol("WM_DELETE_WINDOW", app.on_closing)
         app.mainloop()
