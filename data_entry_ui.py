@@ -851,8 +851,8 @@ class DataEntryWindow(tk.Toplevel):
     def browse_local_files(self):
         """Opens a file dialog to select local media files and updates the display."""
         filetypes = (
-            ('Media files', '*.mp4 *.mkv *.avi *.mov *.webm *.flv *.wmv *.mp3 *.wav *.flac *.aac *.ogg'),
-            ('Video files', '*.mp4 *.mkv *.avi *.mov *.webm *.flv *.wmv'),
+            ('Media files', '*.mp4 *.mkv *.avi *.mov *.webm *.flv *.wmv *.ts *.tp *.mp3 *.wav *.flac *.aac *.ogg'),
+            ('Video files', '*.mp4 *.mkv *.avi *.mov *.webm *.flv *.wmv *.ts *.tp'),
             ('Audio files', '*.mp3 *.wav *.flac *.aac *.ogg'),
             ('All files', '*.*')
         )
@@ -1480,7 +1480,7 @@ class DataEntryWindow(tk.Toplevel):
                 )
             if cursor.fetchone():
                 label = 'Performance' if entry_type == 'performance' else 'Music Video'
-                msg = f"A {label.lower()} with the same artist, title{', and date' if entry_type == 'performance' else ''} already exists."
+                msg = f"A {label.lower} with the same artist, title{', and date' if entry_type == 'performance' else ''} already exists."
                 messagebox.showerror("Duplicate Entry", msg, parent=self)
                 return
 
