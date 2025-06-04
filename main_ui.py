@@ -147,7 +147,11 @@ class ScoreEditorWindow(tk.Toplevel): # Keep this class definition as it was
                 "plus_btn": plus_btn, "minus_btn": minus_btn, "score_label_widget": score_label
             })
             self.update_button_states(score_var.get(), plus_btn, minus_btn)
-            score_label.config(text=str(score_var.get())) 
+            score_label.config(text=str(score_var.get()))  
+            # Add play button for this record
+            play_btn = ttk.Button(item_frame, text="▶", width=3, style="TButton")
+            play_btn.pack(side=tk.RIGHT, padx=(0,20), pady=(0,5))
+            play_btn.config(command=lambda pd=perf_dict: self._play_single(pd.get("playable_path"), pd.get("is_youtube")))
 
         button_frame = ttk.Frame(self, style="TFrame")
         button_frame.pack(fill="x", pady=(5,10), padx=10, side=tk.BOTTOM)
@@ -157,6 +161,15 @@ class ScoreEditorWindow(tk.Toplevel): # Keep this class definition as it was
         self.protocol("WM_DELETE_WINDOW", self.cancel)
         self.focus_set()
         self.update_idletasks()
+
+    def _play_single(self, path, is_youtube):
+        """Helper to play a single item (performance or MV)"""
+        if not path:
+            return
+        try:
+            subprocess.Popen([config.MPV_PLAYER_PATH, '--fs', path])
+        except Exception:
+            webbrowser.open_new_tab(path)
 
     def change_score(self, score_var, delta, plus_btn, minus_btn):
         current_score = score_var.get()
@@ -220,6 +233,20 @@ class ScoreEditorWindow(tk.Toplevel): # Keep this class definition as it was
         if hasattr(self.master, 'score_editor_window') and self.master.score_editor_window == self:
             self.master.score_editor_window = None
         self.destroy()
+
+    def _play_single(self, path, is_youtube):
+        """Helper to play a single item (performance or MV)"""
+        if not path:
+            return
+        
+        if is_youtube:
+            webbrowser.open_new_tab(path)
+        else:
+            # For local files, use mpv player
+            try:
+                subprocess.Popen([config.MPV_PLAYER_PATH, '--fs', path])
+            except Exception as e:
+                messagebox.showerror("Playback Error", f"Failed to play local file: {e}", parent=self)
 
 def show_startup_error_and_exit(title, message):
     """Helper function to show an error and exit before main GUI starts."""
