@@ -40,7 +40,7 @@ FONT_LABEL_SMALL = scale_font(("Courier New", 11))
 FONT_STATUS = scale_font(("Arial", 13))
 FONT_BUTTON = scale_font(("Arial", 13, "bold"))
 
-APP_VERSION = "4.0.2 (Data Entry UI - Phase 1, fonts +15%)" # Updated version
+APP_VERSION = "5.0" # Updated version
 
 class ScoreEditorWindow(tk.Toplevel): # Keep this class definition as it was
     def __init__(self, master, title, performance_details_list_dicts, db_connection, refresh_callback):
@@ -221,7 +221,7 @@ class KpopDBBrowser(tk.Tk):
         super().__init__()
         self.title(f"K-Pop Performance Database Browser v{APP_VERSION}") 
         # Scale window size
-        base_width, base_height = 2560, 1200
+        base_width, base_height = 2560, 1240
         self.geometry(f"{int(base_width*UI_SCALE)}x{int(base_height*UI_SCALE)}")
         self.configure(bg=DARK_BG)
 
@@ -872,25 +872,31 @@ class KpopDBBrowser(tk.Tk):
                     try: mpv_proc.terminate()
                     except: pass
         
-        yt_opened_count = 0
+        yt_played_count = 0
         if youtube_url_list:
-            num_yt_urls = len(youtube_url_list)
-            if app_instance.winfo_exists(): app_instance.after(0, lambda: app_instance.status_var.set(f"Opening {num_yt_urls} YouTube video(s)..."))
-            for url in youtube_url_list:
-                try:
-                    p_url = urlparse(url); q_params = parse_qs(p_url.query)
-                    q_params['autoplay'] = ['1']; q_params['rel'] = ['0'] 
-                    final_url = urlunparse(list(p_url)[:4] + [urlencode(q_params, doseq=True)] + list(p_url)[5:])
-                    if webbrowser.open_new_tab(final_url): yt_opened_count += 1
-                except webbrowser.Error as e:
-                    if app_instance.winfo_exists(): app_instance.after(0, lambda u=url, err=e: app_instance.status_var.set(f"Failed to open {u}: {err}"))
-                except Exception as e: 
-                    if app_instance.winfo_exists(): app_instance.after(0, lambda u=url, err=e: app_instance.status_var.set(f"Error processing URL {u}: {err}"))
+            num_yt = len(youtube_url_list)
             if app_instance.winfo_exists():
-                status_parts = []
-                if local_file_paths_list: status_parts.append(f"{mpv_played_count} local file(s) processed.")
-                status_parts.append(f"{yt_opened_count} of {num_yt_urls} YouTube video(s) opened.")
-                app_instance.after(0, lambda: app_instance.status_var.set(" ".join(status_parts) if status_parts else "No media actions taken."))
+                app_instance.after(0, lambda: app_instance.status_var.set(f"Playing {num_yt} YouTube video(s) via mpv..."))
+            try:
+                mpv_proc = subprocess.Popen([config.MPV_PLAYER_PATH, '--fs'] + youtube_url_list)
+                mpv_proc.wait()
+                yt_played_count = num_yt
+                if app_instance.winfo_exists():
+                    app_instance.after(0, lambda: app_instance.status_var.set(f"Finished playing {yt_played_count} YouTube video(s)."))
+
+            except FileNotFoundError:
+                # Fallback to browser if mpv isn't found
+                if app_instance.winfo_exists():
+                    app_instance.after(0, lambda: app_instance.status_var.set("mpv not found; opening YouTube URLs in browser..."))
+                for url in youtube_url_list:
+                    webbrowser.open_new_tab(url)
+                    yt_played_count += 1
+                if app_instance.winfo_exists():
+                    app_instance.after(0, lambda: app_instance.status_var.set(f"{yt_played_count} YouTube URLs opened in browser."))
+
+            except Exception as e:
+                if app_instance.winfo_exists():
+                    app_instance.after(0, lambda: app_instance.status_var.set(f"Error playing YouTube URLs: {e}"))
 
         if app_instance.winfo_exists():
             app_instance.after(100, app_instance.enable_play_buttons) 
