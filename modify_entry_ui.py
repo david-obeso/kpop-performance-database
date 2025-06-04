@@ -4,6 +4,7 @@ import subprocess
 import webbrowser
 import datetime
 from tkinter import simpledialog
+import os
 
 import db_operations
 import utils
@@ -225,6 +226,17 @@ class ModifyEntryWindow(tk.Toplevel):
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete entry: {e}", parent=self)
             return
+        # Prompt to delete associated local file(s)
+        local_paths = [self.record.get('file_path1'), self.record.get('file_path2')]
+        local_paths = [p for p in local_paths if p]
+        if local_paths:
+            files_list = '\n'.join(local_paths)
+            if messagebox.askyesno("Delete File(s)", f"Do you also want to delete these local file(s)?\n{files_list}", parent=self):
+                for path in local_paths:
+                    try:
+                        os.remove(path)
+                    except Exception as err:
+                        messagebox.showerror("File Delete Error", f"Failed to delete '{path}': {err}", parent=self)
         # Refresh and close
         if self.refresh_callback:
             self.refresh_callback()
