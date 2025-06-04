@@ -257,9 +257,51 @@ class KpopDBBrowser(tk.Tk):
         self.show_local_var = tk.BooleanVar(value=True)  # Local file filter
         self.show_new_var = tk.BooleanVar(value=False)   # New record filter (score 0 or None)
 
+        # Create large checkbox images before widgets that use them
+        self.checkbox_unchecked_img, self.checkbox_checked_img = self._create_checkbox_images(size=28, fg=BRIGHT_FG, bg=DARK_BG, accent=ACCENT)
+
         self.create_widgets()
         self.load_artists() 
         self.load_performances()
+
+    def _create_checkbox_images(self, size=28, fg='#f8f8f2', bg='#222222', accent='#bd93f9'):
+        """Create large checked and unchecked images for checkboxes with correct background."""
+        from tkinter import PhotoImage
+        
+        # Unchecked box
+        unchecked = PhotoImage(width=size, height=size)
+        for x_coord in range(size):
+            for y_coord in range(size):
+                if x_coord in (0, size-1) or y_coord in (0, size-1): # Outer border
+                    unchecked.put(bg, (x_coord, y_coord))
+                elif x_coord in (1, size-2) or y_coord in (1, size-2): # Inner border
+                    unchecked.put(fg, (x_coord, y_coord))
+                else: # Fill
+                    unchecked.put(bg, (x_coord, y_coord))
+
+        # Checked box
+        checked = PhotoImage(width=size, height=size)
+        for x_coord in range(size):
+            for y_coord in range(size):
+                if x_coord in (0, size-1) or y_coord in (0, size-1): # Outer border
+                    checked.put(bg, (x_coord, y_coord))
+                elif x_coord in (1, size-2) or y_coord in (1, size-2): # Inner border
+                    checked.put(fg, (x_coord, y_coord)) # Keep inner border bright
+                else: # Fill - change to accent color
+                    checked.put(accent, (x_coord, y_coord)) # Fill with accent color
+
+        # Draw checkmark using fg (BRIGHT_FG) for max contrast on accent fill
+        checkmark_color = fg 
+        # Using the user's existing checkmark drawing logic
+        for i in range(size//2, size-4):
+            checked.put(checkmark_color, (i, i))
+            checked.put(checkmark_color, (i, i+1))
+            checked.put(checkmark_color, (i, i-1))
+        for i in range(size//2, size-4):
+            checked.put(checkmark_color, (i, size-i-1))
+            checked.put(checkmark_color, (i, size-i-2))
+            
+        return unchecked, checked
 
     def create_widgets(self):
         style = ttk.Style(self)
@@ -278,8 +320,24 @@ class KpopDBBrowser(tk.Tk):
             background=[('readonly', ACCENT), ('active', '#6272a4'), ('disabled', '#303030')],
             arrowcolor=[('readonly', BRIGHT_FG),('active', BRIGHT_FG),('disabled', '#777777')]
         )
-        style.configure("TCheckbutton", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN)
+        # Use classic tk.Checkbutton for larger indicator box
+        checkbox_font = scale_font(("Courier New", 15))
+        # Make checkboxes bigger by increasing padding, font size, and indicator size
+        style.configure("TCheckbutton", background=DARK_BG, foreground=BRIGHT_FG, font=checkbox_font)
         style.map("TCheckbutton", indicatorcolor=[('selected', ACCENT), ('!selected', '#555555')], background=[('active', DARK_BG)])
+        # Increase indicator size (the tickbox square) for ttk themed widgets
+        try:
+            style.element_create("LargeIndicator", "image", "::tk::theme::indicatorLarge", border=2, sticky="")
+            style.layout("TCheckbutton",
+                [('Checkbutton.padding', {'sticky': 'nswe', 'children': [
+                    ('Checkbutton.indicator', {'side': 'left', 'sticky': ''}),
+                    ('Checkbutton.focus', {'side': 'left', 'sticky': '', 'children': [
+                        ('Checkbutton.label', {'sticky': 'nswe'})
+                    ]})
+                ]})]
+            )
+        except Exception:
+            pass  # If the theme or element is not available, ignore
         style.configure("Vertical.TScrollbar", troughcolor=DARK_BG, background=ACCENT, arrowcolor=BRIGHT_FG)
         style.map("Vertical.TScrollbar", background=[("active", "#6272a4")])
         style.configure("Horizontal.TScrollbar", troughcolor=DARK_BG, background=ACCENT, arrowcolor=BRIGHT_FG)
@@ -304,13 +362,17 @@ class KpopDBBrowser(tk.Tk):
         
         # 4K filter: checkbox with label on the right
         self.filter_4k_var = tk.BooleanVar(value=False)
-        filter_4k_checkbutton = ttk.Checkbutton(filter_frame, variable=self.filter_4k_var,
-                                               text="4K", command=lambda: self.update_list(apply_current_sort=True))
+        filter_4k_checkbutton = tk.Checkbutton(filter_frame, variable=self.filter_4k_var,
+                                               text="4K", command=lambda: self.update_list(apply_current_sort=True),
+                                               font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, padx=8, pady=4,
+                                               image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         filter_4k_checkbutton.pack(side="left", padx=(15, 10))
 
         # New records only (score 0 or None)
-        self.new_checkbox = ttk.Checkbutton(filter_frame, text="New", variable=self.show_new_var, 
-                                           command=lambda: self.update_list(apply_current_sort=True))
+        self.new_checkbox = tk.Checkbutton(filter_frame, text="New", variable=self.show_new_var, 
+                                           command=lambda: self.update_list(apply_current_sort=True),
+                                           font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, padx=8, pady=4,
+                                           image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         self.new_checkbox.pack(side="left", padx=(2, 10))
         
         ttk.Label(filter_frame, text="Search:").pack(side="left", padx=(10,0))
@@ -324,15 +386,15 @@ class KpopDBBrowser(tk.Tk):
         header_frame = tk.Frame(self, bg=DARK_BG)
         header_frame.pack(fill="x", padx=10, pady=(5,0))
         
-        # Define column widths and names
+        # Define column widths and names (adjusted for better alignment)
         self.column_info = [
-            {"name": "Date", "width": 12, "key": "performance_date"},
+            {"name": "Date", "width": 13, "key": "performance_date"},
             {"name": "Artist(s)", "width": 32, "key": "artists_str"},
             {"name": "Title", "width": 86, "key": "db_title"},
-            {"name": "Show Type", "width": 20, "key": "show_type"},
-            {"name": "Res", "width": 7, "key": "resolution"},
+            {"name": "Show Type", "width": 22, "key": "show_type"},
+            {"name": "Res", "width": 10, "key": "resolution"},
             {"name": "Score", "width": 6, "key": "score"},
-            {"name": "Source", "width": 10, "key": "source"}
+            {"name": "Source", "width": 12, "key": "source"}
         ]
         
         # Create column header labels and track sort state
@@ -351,10 +413,10 @@ class KpopDBBrowser(tk.Tk):
                 bg=DARK_BG, 
                 fg=BRIGHT_FG,
                 cursor="hand2",  # Hand cursor to indicate clickable
-                padx=2,
+                padx=0,
                 relief="flat"  # Will be changed to "raised" when sorted
             )
-            header_label.pack(side="left", padx=(0 if i == 0 else 1, 0))
+            header_label.pack(side="left", padx=(0 if i == 0 else 0, 0))
             
             # Store reference to label
             self.header_labels.append(header_label)
@@ -362,7 +424,7 @@ class KpopDBBrowser(tk.Tk):
             # Add separator between columns
             if i < len(self.column_info) - 1:
                 separator = tk.Label(header_frame, text="|", font=FONT_HEADER, bg=DARK_BG, fg=BRIGHT_FG)
-                separator.pack(side="left", padx=1)
+                separator.pack(side="left", padx=0)
                 
             # Bind events
             header_label.bind("<Button-1>", lambda e, col_key=col["key"]: self.sort_list_by(col_key))
@@ -392,17 +454,33 @@ class KpopDBBrowser(tk.Tk):
         media_filter_frame = ttk.Frame(self)
         media_filter_frame.pack(fill="x", padx=10, pady=(0,5))
         # Pack right-to-left so items appear in order: MV, Performance, URL, Local
-        self.local_checkbox = ttk.Checkbutton(media_filter_frame, text="Local", variable=self.show_local_var, 
-                                         command=lambda: self.update_list(apply_current_sort=True))
+        self.local_checkbox = tk.Checkbutton(media_filter_frame, text="Local", variable=self.show_local_var, 
+                                         command=lambda: self.update_list(apply_current_sort=True),
+                                         font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, 
+                                         selectcolor=DARK_BG, 
+                                         highlightthickness=0, bd=0, padx=8, pady=4,
+                                         image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         self.local_checkbox.pack(side="right", padx=(0,8))
-        self.url_checkbox = ttk.Checkbutton(media_filter_frame, text="URL", variable=self.show_url_only_var, 
-                                           command=lambda: self.update_list(apply_current_sort=True))
+        self.url_checkbox = tk.Checkbutton(media_filter_frame, text="URL", variable=self.show_url_only_var, 
+                                           command=lambda: self.update_list(apply_current_sort=True),
+                                           font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, 
+                                           selectcolor=DARK_BG, 
+                                           highlightthickness=0, bd=0, padx=8, pady=4,
+                                           image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         self.url_checkbox.pack(side="right", padx=(0,8))
-        self.perf_checkbox = ttk.Checkbutton(media_filter_frame, text="Performance", variable=self.show_perf_var, 
-                                            command=lambda: self.update_list(apply_current_sort=True))
+        self.perf_checkbox = tk.Checkbutton(media_filter_frame, text="Performance", variable=self.show_perf_var, 
+                                            command=lambda: self.update_list(apply_current_sort=True),
+                                            font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, 
+                                            selectcolor=DARK_BG, 
+                                            highlightthickness=0, bd=0, padx=8, pady=4,
+                                            image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         self.perf_checkbox.pack(side="right", padx=(0,8))
-        self.mv_checkbox = ttk.Checkbutton(media_filter_frame, text="MV", variable=self.show_mv_var, 
-                                          command=lambda: self.update_list(apply_current_sort=True))
+        self.mv_checkbox = tk.Checkbutton(media_filter_frame, text="MV", variable=self.show_mv_var, 
+                                          command=lambda: self.update_list(apply_current_sort=True),
+                                          font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, 
+                                          selectcolor=DARK_BG, 
+                                          highlightthickness=0, bd=0, padx=8, pady=4,
+                                          image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         self.mv_checkbox.pack(side="right", padx=(0,8))
 
         # Management frame for Add/Modify Data button
@@ -430,7 +508,9 @@ class KpopDBBrowser(tk.Tk):
         )
         self.random_count_dropdown.pack(side="left")
         
-        self.change_score_checkbox = ttk.Checkbutton(play_controls_frame, text="Change Score After Play", variable=self.change_score_var)
+        self.change_score_checkbox = tk.Checkbutton(play_controls_frame, text="Change Score After Play", variable=self.change_score_var,
+                                                    font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, highlightthickness=0, bd=0, padx=8, pady=4,
+                                                    image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
         self.change_score_checkbox.pack(side="left", padx=(20, 0))
 
         # Status bar (packed last to ensure it's at the very bottom)
