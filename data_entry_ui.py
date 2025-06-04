@@ -1382,36 +1382,38 @@ class DataEntryWindow(tk.Toplevel):
         # Process the matches to select songs
         high_confidence_matches = [match for match in song_matches if match[2] >= 70]  # Score >= 70
         
-        if high_confidence_matches:
-            # Clear existing song selections
-            self.selected_song_ids = []
-            self.selected_song_titles = []
-            
-            # Add all high confidence matches
-            selected_titles = set()  # Use a set to avoid duplicates
-            for song_id, song_title, score, match_type in high_confidence_matches[:3]:  # Limit to top 3
-                if song_title not in selected_titles:  # Avoid duplicates
-                    rb = ttk.Radiobutton(self.matches_frame, text=f"{song_title} (Score: {score:.2f}, Type: {match_type})",
-                                          variable=self.selected_song_var, value=song_id, style="DataEntry.TRadiobutton")
-                    rb.pack(anchor="w", padx=10, pady=2)
-                    selected_titles.add(song_title)
-            
-            # If there are still no selections, fall back to low confidence matches
-            if not selected_titles:
-                low_confidence_matches = [match for match in song_matches if match[2] < 70]
-                for song_id, song_title, score, match_type in low_confidence_matches[:3]:  # Limit to top 3
-                    if song_title not in selected_titles:  # Avoid duplicates
-                        rb = ttk.Radiobutton(self.matches_frame, text=f"{song_title} (Score: {score:.2f}, Type: {match_type})",
-                                              variable=self.selected_song_var, value=song_id, style="DataEntry.TRadiobutton")
-                        rb.pack(anchor="w", padx=10, pady=2)
-                        selected_titles.add(song_title)
+        # Clear existing song selections
+        self.selected_song_ids = []
+        self.selected_song_titles = []
         
-        # If still no matches, show a message
+        # Add high confidence matches first
+        selected_titles = set()  # Use a set to avoid duplicates
+        for song_id, song_title, score, match_type in high_confidence_matches[:3]:  # Limit to top 3
+            if song_title not in selected_titles:  # Avoid duplicates
+                self.selected_song_ids.append(song_id)
+                self.selected_song_titles.append(song_title)
+                selected_titles.add(song_title)
+                print(f"Auto-selected song: {song_title} (Score: {score:.1f}, Type: {match_type})")
+        
+        # If no high confidence matches, try low confidence matches
         if not selected_titles:
-            ttk.Label(self.matches_frame, text="No song matches found in filename.", style="DataEntry.TLabel", foreground="red").pack(anchor="w", padx=10, pady=2)
-
-        # Enable the save button if there are any matches
-        self.save_entry_button.config(state=tk.NORMAL)
+            low_confidence_matches = [match for match in song_matches if match[2] < 70 and match[2] >= 50]  # Score 50-69
+            for song_id, song_title, score, match_type in low_confidence_matches[:2]:  # Limit to top 2
+                if song_title not in selected_titles:  # Avoid duplicates
+                    self.selected_song_ids.append(song_id)
+                    self.selected_song_titles.append(song_title)
+                    selected_titles.add(song_title)
+                    print(f"Auto-selected song (low confidence): {song_title} (Score: {score:.1f}, Type: {match_type})")
+        
+        # If we found songs, update the title and refresh the UI
+        if selected_titles:
+            print(f"Auto-detected {len(selected_titles)} song(s) from filename")
+            # Update the title field with the detected songs
+            self.update_title_from_songs()
+            # Refresh the UI to show the selected songs
+            self.handle_proceed()
+        else:
+            print("No song matches found in filename")
 
     def remove_selected_song(self, idx):
         title_to_remove = self.selected_song_titles[idx]
