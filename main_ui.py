@@ -517,7 +517,7 @@ class KpopDBBrowser(tk.Tk):
         self.perf_checkbox.pack(side="right", padx=(0,8))
         self.mv_checkbox = tk.Checkbutton(media_filter_frame, text="MV", variable=self.show_mv_var, 
                                           command=lambda: self.update_list(apply_current_sort=True),
-                                          font=checkbox_font, bg=DARK_BG, fg=BRIGHT_FG, activebackground=DARK_BG, activeforeground=BRIGHT_FG, 
+                                          font=checkbox_font, bg=DARK_BG, fg="#8be9fd", activebackground=DARK_BG, activeforeground="#8be9fd", 
                                           selectcolor=DARK_BG, 
                                           highlightthickness=0, bd=0, padx=8, pady=4,
                                           image=self.checkbox_unchecked_img, selectimage=self.checkbox_checked_img, indicatoron=False, compound='left')
