@@ -762,7 +762,12 @@ class KpopDBBrowser(tk.Tk):
             display_string = (f"{disp_date:<12} | {disp_artists:<30.30} | {disp_perf_title:<85.85} | "
                             f"{disp_show_type:<20.20} | {disp_res:<8.8} | {disp_score:<5} | {source_text}")
             
+            # Insert the entry and color music videos bright blue
+            idx = self.listbox.size()
             self.listbox.insert(tk.END, display_string)
+            if perf_data.get("entry_type") == "mv":
+                # Bright blue for music video items
+                self.listbox.itemconfig(idx, fg="#8be9fd")
             
         self.status_var.set(f"{len(self.filtered_performances_data)} records match your filters.")
 
