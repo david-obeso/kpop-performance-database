@@ -986,21 +986,54 @@ class DataEntryWindow(tk.Toplevel):
         print(f"Attempting to save: Entry Type='{entry_type}', Source Type='{source_type}'")
 
         if source_type == "url":
-            # Existing URL saving logic (simplified for brevity, keep your original logic here)
+            # Gather URL entry details
             url = self.url_entry_var.get().strip()
-            artist_name = self.primary_artist_var.get().strip()
-            # ... other fields for URL ...
-            print(f"URL Data: URL={url}, Artist={artist_name}, ...")
-            # ... your actual db_ops calls for URL ...
-            if entry_type == "music_video":
-                # self.db_ops.add_music_video(...)
-                messagebox.showinfo("Saved", f"Music Video (from URL) '{self.title_var.get()}' would be saved.", parent=self)
-            elif entry_type == "performance":
-                # self.db_ops.add_performance(...)
-                messagebox.showinfo("Saved", f"Performance (from URL) '{self.title_var.get()}' would be saved.", parent=self)
-            
-            # Reset fields after successful save from URL (handled by popup closing or here)
-
+            primary_artist = self.primary_artist_var.get().strip()
+            secondary_artist = None
+            if hasattr(self, 'secondary_artist_var') and self.secondary_artist_var.get().strip():
+                secondary_artist = self.secondary_artist_var.get().strip()
+            song_titles = self.selected_song_titles
+            title = self.title_var.get().strip()
+            raw_date = self.date_var.get().strip()
+            formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
+            perf_date = formatted_date if formatted_date else raw_date
+            artist_names = [primary_artist] + ([secondary_artist] if secondary_artist else [])
+            try:
+                if entry_type == "music_video":
+                    # Insert Music Video record
+                    self.db_ops.insert_music_video(
+                        title=title,
+                        release_date=perf_date,
+                        file_path1=None,
+                        file_url=url,
+                        score=0,
+                        artist_names=artist_names,
+                        song_titles=song_titles
+                    )
+                    messagebox.showinfo("Saved", f"Music Video '{title}' saved successfully.", parent=self)
+                elif entry_type == "performance":
+                    # Insert Performance record
+                    show_type = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else ''
+                    resolution = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else ''
+                    self.db_ops.insert_performance(
+                        title=title,
+                        performance_date=perf_date,
+                        show_type=show_type,
+                        resolution=resolution,
+                        file_path1=None,
+                        file_url=url,
+                        score=0,
+                        artist_names=artist_names,
+                        song_titles=song_titles
+                    )
+                    messagebox.showinfo("Saved", f"Performance '{title}' saved successfully.", parent=self)
+                # Refresh main window data and reset form
+                self.master_app.load_performances()
+                self.master_app.update_list()
+                self.reset_form_fields()
+            except Exception as e:
+                messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)
+            return
         elif source_type == "local_file":
             # Placeholder for single local file saving logic
             primary_artist = self.primary_artist_var.get().strip()
@@ -1014,7 +1047,7 @@ class DataEntryWindow(tk.Toplevel):
             # --- DB-duplication checks ---
             conn = self.db_ops.get_db_connection()
             cursor = conn.cursor()
-            # 1. Ensure selected file is not already in DB
+            #  1. Ensure selected file is not already in DB
             if file_path1:
                 table = 'performances' if entry_type == 'performance' else 'music_videos'
                 query = f"SELECT 1 FROM {table} WHERE file_path1 = ?"
@@ -1043,7 +1076,7 @@ class DataEntryWindow(tk.Toplevel):
                 )
             if cursor.fetchone():
                 label = 'Performance' if entry_type == 'performance' else 'Music Video'
-                msg = f"A {label.lower()} with the same artist, title{', and date' if entry_type == 'performance' else ''} already exists."
+                msg = f"A {label.lower} with the same artist, title{', and date' if entry_type == 'performance' else ''} already exists."
                 messagebox.showerror("Duplicate Entry", msg, parent=self)
                 return
 
@@ -1465,21 +1498,54 @@ class DataEntryWindow(tk.Toplevel):
         print(f"Attempting to save: Entry Type='{entry_type}', Source Type='{source_type}'")
 
         if source_type == "url":
-            # Existing URL saving logic (simplified for brevity, keep your original logic here)
+            # Gather URL entry details
             url = self.url_entry_var.get().strip()
-            artist_name = self.primary_artist_var.get().strip()
-            # ... other fields for URL ...
-            print(f"URL Data: URL={url}, Artist={artist_name}, ...")
-            # ... your actual db_ops calls for URL ...
-            if entry_type == "music_video":
-                # self.db_ops.add_music_video(...)
-                messagebox.showinfo("Saved", f"Music Video (from URL) '{self.title_var.get()}' would be saved.", parent=self)
-            elif entry_type == "performance":
-                # self.db_ops.add_performance(...)
-                messagebox.showinfo("Saved", f"Performance (from URL) '{self.title_var.get()}' would be saved.", parent=self)
-            
-            # Reset fields after successful save from URL (handled by popup closing or here)
-
+            primary_artist = self.primary_artist_var.get().strip()
+            secondary_artist = None
+            if hasattr(self, 'secondary_artist_var') and self.secondary_artist_var.get().strip():
+                secondary_artist = self.secondary_artist_var.get().strip()
+            song_titles = self.selected_song_titles
+            title = self.title_var.get().strip()
+            raw_date = self.date_var.get().strip()
+            formatted_date = self._convert_yymmdd_to_yyyy_mm_dd(raw_date)
+            perf_date = formatted_date if formatted_date else raw_date
+            artist_names = [primary_artist] + ([secondary_artist] if secondary_artist else [])
+            try:
+                if entry_type == "music_video":
+                    # Insert Music Video record
+                    self.db_ops.insert_music_video(
+                        title=title,
+                        release_date=perf_date,
+                        file_path1=None,
+                        file_url=url,
+                        score=0,
+                        artist_names=artist_names,
+                        song_titles=song_titles
+                    )
+                    messagebox.showinfo("Saved", f"Music Video '{title}' saved successfully.", parent=self)
+                elif entry_type == "performance":
+                    # Insert Performance record
+                    show_type = self.show_type_var.get().strip() if hasattr(self, 'show_type_var') else ''
+                    resolution = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else ''
+                    self.db_ops.insert_performance(
+                        title=title,
+                        performance_date=perf_date,
+                        show_type=show_type,
+                        resolution=resolution,
+                        file_path1=None,
+                        file_url=url,
+                        score=0,
+                        artist_names=artist_names,
+                        song_titles=song_titles
+                    )
+                    messagebox.showinfo("Saved", f"Performance '{title}' saved successfully.", parent=self)
+                # Refresh main window data and reset form
+                self.master_app.load_performances()
+                self.master_app.update_list()
+                self.reset_form_fields()
+            except Exception as e:
+                messagebox.showerror("Database Error", f"Failed to save entry: {e}", parent=self)
+            return
         elif source_type == "local_file":
             # Placeholder for single local file saving logic
             primary_artist = self.primary_artist_var.get().strip()
