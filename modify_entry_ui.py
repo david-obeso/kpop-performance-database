@@ -27,7 +27,9 @@ class ModifyEntryWindow(tk.Toplevel):
         super().__init__(master)
         self.record = record
         self.refresh_callback = refresh_callback
-        self.title("Modify Entry")
+        # Set window title to include the entry's current title
+        entry_title = self.record.get('db_title', '') or self.record.get('db_title', '')
+        self.title(f"Modify Entry - {entry_title}")
         self.configure(bg=DARK_BG)
         self.transient(master)
         self.grab_set()
