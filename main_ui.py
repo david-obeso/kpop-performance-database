@@ -40,7 +40,7 @@ FONT_LABEL_SMALL = scale_font(("Courier New", 11))
 FONT_STATUS = scale_font(("Arial", 13))
 FONT_BUTTON = scale_font(("Arial", 13, "bold"))
 
-APP_VERSION = "5.0" # Updated version
+APP_VERSION = "5.1" # Updated version
 
 class ScoreEditorWindow(tk.Toplevel): # Keep this class definition as it was
     def __init__(self, master, title, performance_details_list_dicts, db_connection, refresh_callback):
