@@ -515,7 +515,7 @@ class DataEntryWindow(tk.Toplevel):
 
         ttk.Label(artist_frame, text="Primary Artist:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
         artist_entry = ttk.Entry(
-            artist_frame, textvariable=self.primary_artist_var, width=30, style="DataEntry.TEntry", state="readonly"
+            artist_frame, textvariable=self.primary_artist_var, width=30, font=FONT_MAIN, style="DataEntry.TEntry", state="readonly"
         )
         artist_entry.grid(row=0, column=1, sticky="ew", pady=2, padx=(2,0))
         select_btn = ttk.Button(
@@ -544,7 +544,7 @@ class DataEntryWindow(tk.Toplevel):
         if self.secondary_artist_var.get():
             ttk.Label(artist_frame, text="Secondary Artist:", style="DataEntry.TLabel").grid(row=2, column=0, sticky="w", pady=2, padx=2)
             secondary_entry = ttk.Entry(
-                artist_frame, textvariable=self.secondary_artist_var, width=30, style="DataEntry.TEntry", state="readonly"
+                artist_frame, textvariable=self.secondary_artist_var, width=30, font=FONT_MAIN, style="DataEntry.TEntry", state="readonly"
             )
             secondary_entry.grid(row=2, column=1, sticky="ew", pady=2, padx=(2,0))
             select_secondary_btn = ttk.Button(
@@ -575,7 +575,7 @@ class DataEntryWindow(tk.Toplevel):
         title_frame = ttk.Frame(parent_frame, style="DataEntry.TFrame")
         title_frame.pack(fill="x", pady=(10,0))
         ttk.Label(title_frame, text="Title:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
-        title_entry = ttk.Entry(title_frame, textvariable=self.title_var, width=70, style="DataEntry.TEntry")
+        title_entry = ttk.Entry(title_frame, textvariable=self.title_var, width=70, font=FONT_MAIN, style="DataEntry.TEntry")
         title_entry.grid(row=0, column=1, sticky="ew", pady=2, padx=(2,0))
         self._add_right_click_paste(title_entry)
         title_frame.columnconfigure(1, weight=1)
@@ -586,7 +586,7 @@ class DataEntryWindow(tk.Toplevel):
         ttk.Label(date_frame, text="Date (YYMMDD):", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
         if not self.date_var.get(): # Initialize if empty
             self.date_var.set("") 
-        self.date_entry = ttk.Entry(date_frame, textvariable=self.date_var, width=12, style="DataEntry.TEntry")
+        self.date_entry = ttk.Entry(date_frame, textvariable=self.date_var, width=12, font=FONT_MAIN, style="DataEntry.TEntry")
         self.date_entry.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
         self._add_right_click_paste(self.date_entry)
         ttk.Label(date_frame, text="(e.g. 240530)", style="DataEntry.TLabel").grid(row=0, column=2, sticky="w", padx=(8,2))
@@ -739,7 +739,7 @@ class DataEntryWindow(tk.Toplevel):
         url_frame.pack(fill="x", pady=5, anchor="n")
 
         ttk.Label(url_frame, text="URL:", style="DataEntry.TLabel").pack(anchor="w", pady=(0,2))
-        url_entry = ttk.Entry(url_frame, textvariable=self.url_entry_var, width=70, style="DataEntry.TEntry")
+        url_entry = ttk.Entry(url_frame, textvariable=self.url_entry_var, width=70, font=FONT_MAIN, style="DataEntry.TEntry")
         url_entry.pack(fill="x", pady=(0,5))
         self._add_right_click_paste(url_entry)
         self.after(100, lambda: url_entry.focus_set()) # Focus URL entry
@@ -780,7 +780,7 @@ class DataEntryWindow(tk.Toplevel):
         self.play_button.pack(side=tk.LEFT, padx=(8,2), pady=(0,2))
 
         # File path entry directly below buttons
-        selected_files_entry = ttk.Entry(file_selection_frame, textvariable=self.local_files_display_var, style="DataEntry.TEntry", state='readonly', width=80)
+        selected_files_entry = ttk.Entry(file_selection_frame, textvariable=self.local_files_display_var, width=80, font=FONT_MAIN, style="DataEntry.TEntry", state='readonly')
         selected_files_entry.pack(fill="x", padx=2, pady=(6, 10))
 
         # --- Common Details Section ---

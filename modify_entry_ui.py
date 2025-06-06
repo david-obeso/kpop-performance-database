@@ -41,12 +41,12 @@ class ModifyEntryWindow(tk.Toplevel):
         # Title
         ttk.Label(form_frame, text="Title:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=0, column=0, sticky="w", pady=2)
         self.title_var = tk.StringVar(value=self.record.get("db_title", ""))
-        ttk.Entry(form_frame, textvariable=self.title_var, width=50).grid(row=0, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.title_var, width=50, font=FONT_MAIN).grid(row=0, column=1, sticky="w", pady=2)
 
         # Date
         ttk.Label(form_frame, text="Date (YYYY-MM-DD):", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=1, column=0, sticky="w", pady=2)
         self.date_var = tk.StringVar(value=self.record.get("performance_date", ""))
-        ttk.Entry(form_frame, textvariable=self.date_var, width=20).grid(row=1, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.date_var, width=20, font=FONT_MAIN).grid(row=1, column=1, sticky="w", pady=2)
 
         # Load choices for show type and resolution from DB
         try:
@@ -98,17 +98,17 @@ class ModifyEntryWindow(tk.Toplevel):
         # File Path1
         ttk.Label(form_frame, text="File Path1:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=4, column=0, sticky="w", pady=2)
         self.file_path1_var = tk.StringVar(value=self.record.get("file_path1", "") or "")
-        ttk.Entry(form_frame, textvariable=self.file_path1_var, width=60, state='readonly').grid(row=4, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.file_path1_var, width=60, state='readonly', font=FONT_MAIN).grid(row=4, column=1, sticky="w", pady=2)
 
         # File Path2
         ttk.Label(form_frame, text="File Path2:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=5, column=0, sticky="w", pady=2)
         self.file_path2_var = tk.StringVar(value=self.record.get("file_path2", "") or "")
-        ttk.Entry(form_frame, textvariable=self.file_path2_var, width=60, state='readonly').grid(row=5, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.file_path2_var, width=60, state='readonly', font=FONT_MAIN).grid(row=5, column=1, sticky="w", pady=2)
 
         # URL
         ttk.Label(form_frame, text="URL:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=6, column=0, sticky="w", pady=2)
         self.file_url_var = tk.StringVar(value=self.record.get("file_url", "") or "")
-        ttk.Entry(form_frame, textvariable=self.file_url_var, width=60, state='readonly').grid(row=6, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.file_url_var, width=60, state='readonly', font=FONT_MAIN).grid(row=6, column=1, sticky="w", pady=2)
 
         # Score
         ttk.Label(form_frame, text="Score:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=7, column=0, sticky="w", pady=2)
@@ -121,18 +121,18 @@ class ModifyEntryWindow(tk.Toplevel):
         secondary = rest[0] if rest else ""
         ttk.Label(form_frame, text="Primary Artist:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=8, column=0, sticky="w", pady=2)
         self.primary_artist_var = tk.StringVar(value=primary)
-        ttk.Entry(form_frame, textvariable=self.primary_artist_var, width=30, state='readonly').grid(row=8, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.primary_artist_var, width=30, state='readonly', font=FONT_MAIN).grid(row=8, column=1, sticky="w", pady=2)
         ttk.Button(form_frame, text="Select...", command=self.show_artist_listbox_popup).grid(row=8, column=2, sticky="w", padx=5)
         # Secondary Artist
         ttk.Label(form_frame, text="Secondary Artist:", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=9, column=0, sticky="w", pady=2)
         self.secondary_artist_var = tk.StringVar(value=secondary)
-        ttk.Entry(form_frame, textvariable=self.secondary_artist_var, width=30, state='readonly').grid(row=9, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.secondary_artist_var, width=30, state='readonly', font=FONT_MAIN).grid(row=9, column=1, sticky="w", pady=2)
         ttk.Button(form_frame, text="Select...", command=self.show_secondary_artist_listbox_popup).grid(row=9, column=2, sticky="w", padx=5)
 
         # Songs
         ttk.Label(form_frame, text="Songs (comma-separated):", background=DARK_BG, foreground=BRIGHT_FG, font=FONT_MAIN).grid(row=10, column=0, sticky="w", pady=2)
         self.songs_var = tk.StringVar(value=self.record.get("songs_str", ""))
-        ttk.Entry(form_frame, textvariable=self.songs_var, width=60).grid(row=10, column=1, sticky="w", pady=2)
+        ttk.Entry(form_frame, textvariable=self.songs_var, width=60, font=FONT_MAIN).grid(row=10, column=1, sticky="w", pady=2)
         ttk.Button(form_frame, text="Select Song(s)", command=self.show_song_selection_popup).grid(row=10, column=2, sticky="w", padx=5)
 
         # Buttons
