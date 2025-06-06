@@ -32,7 +32,7 @@ class DataEntryWindow(tk.Toplevel):
     def __init__(self, master, db_ops): 
         super().__init__(master)
         self.title("Add Database Entry")
-        self.geometry("900x1050")
+        self.geometry("900x1100")
         self.configure(bg=DARK_BG)
         self.transient(master)
         self.grab_set()
