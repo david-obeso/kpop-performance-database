@@ -1,6 +1,22 @@
 # db_operations.py
 import sqlite3
 import config # To get DATABASE_FILE
+import os
+
+def _get_windows_path(linux_path):
+    """Convert a Linux path under windows_f_drive or windows_g_drive to a Windows drive path."""
+    if not linux_path:
+        return None
+    parts = linux_path.split(os.path.sep)
+    if 'windows_f_drive' in parts:
+        idx = parts.index('windows_f_drive')
+        relative = parts[idx+1:]
+        return 'F:\\' + '\\'.join(relative)
+    if 'windows_g_drive' in parts:
+        idx = parts.index('windows_g_drive')
+        relative = parts[idx+1:]
+        return 'G:\\' + '\\'.join(relative)
+    return None
 
 _connection = None # Module-level variable to hold the connection
 
@@ -106,11 +122,13 @@ def insert_music_video(title, release_date, file_path1=None, file_url=None, scor
     if song_titles is None:
         song_titles = []
     conn = get_db_connection()
+    # Compute Windows drive path for local file (file_path2)
+    file_path2 = _get_windows_path(file_path1)
     cursor = conn.cursor()
-    # 1. Insert music video (including file_path1)
+    # 1. Insert music video (including file_path1 and file_path2)
     cursor.execute(
-        "INSERT INTO music_videos (title, release_date, file_path1, file_url, score) VALUES (?, ?, ?, ?, ?)",
-        (title, release_date, file_path1, file_url, score)
+        "INSERT INTO music_videos (title, release_date, file_path1, file_path2, file_url, score) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, release_date, file_path1, file_path2, file_url, score)
     )
     mv_id = cursor.lastrowid
     # 2. Link artists
@@ -186,10 +204,12 @@ def insert_performance(title, performance_date, show_type, resolution, file_path
         song_titles = []
     conn = get_db_connection()
     cursor = conn.cursor()
-    # 1. Insert performance (including file_path1)
+    # Compute Windows drive path for local file (file_path2)
+    file_path2 = _get_windows_path(file_path1)
+    # 1. Insert performance (including file_path1 and file_path2)
     cursor.execute(
-        "INSERT INTO performances (title, performance_date, show_type, resolution, file_path1, file_url, score) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (title, performance_date, show_type, resolution, file_path1, file_url, score)
+        "INSERT INTO performances (title, performance_date, show_type, resolution, file_path1, file_path2, file_url, score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (title, performance_date, show_type, resolution, file_path1, file_path2, file_url, score)
     )
     perf_id = cursor.lastrowid
     # 2. Link artists
