@@ -107,18 +107,21 @@ mount_drive() {
     local mount_options=""
     case "$fstype" in
         "ntfs"|"exfat"|"vfat")
-            mount_options="-o uid=$(id -u),gid=$(id -g),umask=022,rw"
+            # Mount with ownership of the invoking user (david) via SUDO_UID/SUDO_GID
+            mount_options="-o uid=${SUDO_UID},gid=${SUDO_GID},umask=022,rw"
             ;;
         *)
             mount_options="-o rw"
             ;;
     esac
-    
+
     # Mount the drive
     if mount $mount_options "$device" "$mount_point"; then
         log_message "Successfully mounted '$label' ($device) at '$mount_point'"
         # Set permissions to ensure accessibility
         chmod 755 "$mount_point" 2>/dev/null || true
+        # Ensure the mounted content is owned by the original user (david)
+        chown -R "${SUDO_USER}:${SUDO_USER}" "$mount_point" 2>/dev/null || true
         return 0
     else
         log_message "ERROR: Failed to mount '$label' ($device) at '$mount_point'"
