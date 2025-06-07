@@ -2,20 +2,20 @@
 import sqlite3
 import config # To get DATABASE_FILE
 import os
+import re
 
 def _get_windows_path(linux_path):
-    """Convert a Linux path under windows_f_drive or windows_g_drive to a Windows drive path."""
+    """Convert a Linux path under windows_<letter>_drive to the corresponding Windows drive path."""
     if not linux_path:
         return None
     parts = linux_path.split(os.path.sep)
-    if 'windows_f_drive' in parts:
-        idx = parts.index('windows_f_drive')
-        relative = parts[idx+1:]
-        return 'F:\\' + '\\'.join(relative)
-    if 'windows_g_drive' in parts:
-        idx = parts.index('windows_g_drive')
-        relative = parts[idx+1:]
-        return 'G:\\' + '\\'.join(relative)
+    for idx, part in enumerate(parts):
+        m = re.match(r'windows_([a-z])_drive', part)
+        if m:
+            drive_letter = m.group(1).upper()
+            relative = parts[idx+1:]
+            # Construct Windows path with backslashes
+            return f"{drive_letter}:\\" + "\\".join(relative)
     return None
 
 _connection = None # Module-level variable to hold the connection
