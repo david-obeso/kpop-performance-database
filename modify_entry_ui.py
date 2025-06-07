@@ -235,6 +235,9 @@ class ModifyEntryWindow(tk.Toplevel):
             files_list = '\n'.join(local_paths)
             if messagebox.askyesno("Delete File(s)", f"Do you also want to delete these local file(s)?\n{files_list}", parent=self):
                 for path in local_paths:
+                    # Only attempt to delete if file exists
+                    if not os.path.exists(path):
+                        continue
                     try:
                         os.remove(path)
                     except Exception as err:

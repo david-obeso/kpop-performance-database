@@ -1181,10 +1181,15 @@ class KpopDBBrowser(tk.Tk):
         unmount_script = os.path.expanduser("./unmount_kpop_drives.sh")
         try:
             unmount_res = subprocess.run(['sudo', unmount_script], capture_output=True, text=True)
-            if unmount_res.returncode == 0:
+            # If exit code is zero or stdout indicates success, show info; otherwise warn or error
+            stdout = unmount_res.stdout or ''
+            stderr = unmount_res.stderr or ''
+            if unmount_res.returncode == 0 or "All mounted K-Pop drives unmounted successfully" in stdout:
                 messagebox.showinfo("Unmount Drives", "K-Pop drives unmounted successfully.")
+            elif stderr:
+                messagebox.showerror("Unmount Drives Error", f"Unmount script reported errors:\n{stderr}")
             else:
-                messagebox.showerror("Unmount Drives Error", f"Unmount script failed:\n{unmount_res.stderr}")
+                messagebox.showwarning("Unmount Drives", "Unmount script exited with non-zero status but provided no error details.")
         except Exception as unmount_exc:
             messagebox.showerror("Unmount Drives Exception", f"Error running unmount script: {unmount_exc}")
         if self.score_editor_window and self.score_editor_window.winfo_exists():
