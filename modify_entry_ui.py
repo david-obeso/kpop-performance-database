@@ -150,17 +150,24 @@ class ModifyEntryWindow(tk.Toplevel):
             cur = conn.cursor()
             cur.execute("SELECT DISTINCT show_type FROM performances WHERE show_type IS NOT NULL AND TRIM(show_type)!='' ORDER BY show_type;")
             self.show_type_choices = [row[0] for row in cur.fetchall() if row[0]]
+            
+            # Load resolution choices from both performances and music_videos tables
+            resolution_set = set()
             cur.execute("SELECT DISTINCT resolution FROM performances WHERE resolution IS NOT NULL AND TRIM(resolution)!='' ORDER BY resolution;")
-            self.resolution_choices = [row[0] for row in cur.fetchall() if row[0]]
+            resolution_set.update(row[0] for row in cur.fetchall() if row[0])
+            cur.execute("SELECT DISTINCT resolution FROM music_videos WHERE resolution IS NOT NULL AND TRIM(resolution)!='' ORDER BY resolution;")
+            resolution_set.update(row[0] for row in cur.fetchall() if row[0])
+            
+            self.resolution_choices = sorted(list(resolution_set), key=lambda s: s.lower())
         except Exception:
             self.show_type_choices = []
             self.resolution_choices = []
 
-        # Disable Show Type and Resolution for music video entries
+        # Disable Show Type for music video entries (but enable Resolution)
         entry_type = self.record.get('entry_type', 'performance')
         if entry_type != 'performance':
             showtype_combo.config(state='disabled')
-            res_combo.config(state='disabled')
+            # Keep resolution enabled for music videos
 
     def save_modified_entry(self):
         # Gather values
@@ -195,10 +202,11 @@ class ModifyEntryWindow(tk.Toplevel):
                 )
                 messagebox.showinfo("Success", "Performance updated successfully.", parent=self)
             else:
+                resolution = self.resolution_var.get().strip()
                 mv_id_raw = self.record.get('performance_id')
                 mv_id = int(mv_id_raw.split('_',1)[1]) if isinstance(mv_id_raw, str) and mv_id_raw.startswith('mv_') else mv_id_raw
                 db_operations.update_music_video(
-                    mv_id, title, date,
+                    mv_id, title, date, resolution,
                     file_path1, file_path2, file_url, score,
                     artists, songs
                 )

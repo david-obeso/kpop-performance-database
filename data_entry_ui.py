@@ -294,8 +294,15 @@ class DataEntryWindow(tk.Toplevel):
             cur = conn.cursor()
             cur.execute("SELECT DISTINCT show_type FROM performances WHERE show_type IS NOT NULL AND TRIM(show_type) != '' ORDER BY show_type;")
             self.show_type_choices = [row[0] for row in cur.fetchall() if row[0]]
+            
+            # Load resolution choices from both performances and music_videos tables
+            resolution_set = set()
             cur.execute("SELECT DISTINCT resolution FROM performances WHERE resolution IS NOT NULL AND TRIM(resolution) != '' ORDER BY resolution;")
-            self.resolution_choices = [row[0] for row in cur.fetchall() if row[0]]
+            resolution_set.update(row[0] for row in cur.fetchall() if row[0])
+            cur.execute("SELECT DISTINCT resolution FROM music_videos WHERE resolution IS NOT NULL AND TRIM(resolution) != '' ORDER BY resolution;")
+            resolution_set.update(row[0] for row in cur.fetchall() if row[0])
+            
+            self.resolution_choices = sorted(list(resolution_set), key=lambda s: s.lower())
         except Exception as e:
             self.show_type_choices = []
             self.resolution_choices = []
@@ -591,7 +598,7 @@ class DataEntryWindow(tk.Toplevel):
         self._add_right_click_paste(self.date_entry)
         ttk.Label(date_frame, text="(e.g. 240530)", style="DataEntry.TLabel").grid(row=0, column=2, sticky="w", padx=(8,2))
 
-        # SHOW TYPE AND RESOLUTION (only for performances)
+        # SHOW TYPE AND RESOLUTION
         if entry_type == "performance":
             showtype_frame = ttk.Frame(parent_frame, style="DataEntry.TFrame")
             showtype_frame.pack(fill="x", pady=(10,0))
@@ -611,23 +618,24 @@ class DataEntryWindow(tk.Toplevel):
                         self.show_type_var.set(new_val)
             showtype_combo.bind("<<ComboboxSelected>>", on_showtype_select)
 
-            resolution_frame = ttk.Frame(parent_frame, style="DataEntry.TFrame")
-            resolution_frame.pack(fill="x", pady=(10,0))
-            ttk.Label(resolution_frame, text="Resolution:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
-            if not hasattr(self, 'resolution_var'):
-                self.resolution_var = tk.StringVar()
-            resolution_combo = ttk.Combobox(resolution_frame, textvariable=self.resolution_var, values=self.resolution_choices + ["<Add new>"] if self.resolution_choices else ["<Add new>"], state="readonly", style="DataEntry.TCombobox", width=30)
-            resolution_combo.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
-            def on_resolution_select(event=None):
-                if self.resolution_var.get() == "<Add new>":
-                    new_val = tk.simpledialog.askstring("Add Resolution", "Enter new resolution:", parent=self)
-                    if new_val:
-                        if new_val not in self.resolution_choices:
-                            self.resolution_choices.append(new_val)
-                            self.resolution_choices.sort(key=lambda s: s.lower())
-                        resolution_combo['values'] = self.resolution_choices + ["<Add new>"]
-                        self.resolution_var.set(new_val)
-            resolution_combo.bind("<<ComboboxSelected>>", on_resolution_select)
+        # RESOLUTION (for both performances and music videos)
+        resolution_frame = ttk.Frame(parent_frame, style="DataEntry.TFrame")
+        resolution_frame.pack(fill="x", pady=(10,0))
+        ttk.Label(resolution_frame, text="Resolution:", style="DataEntry.TLabel").grid(row=0, column=0, sticky="w", pady=2, padx=2)
+        if not hasattr(self, 'resolution_var'):
+            self.resolution_var = tk.StringVar()
+        resolution_combo = ttk.Combobox(resolution_frame, textvariable=self.resolution_var, values=self.resolution_choices + ["<Add new>"] if self.resolution_choices else ["<Add new>"], state="readonly", style="DataEntry.TCombobox", width=30)
+        resolution_combo.grid(row=0, column=1, sticky="w", pady=2, padx=(2,0))
+        def on_resolution_select(event=None):
+            if self.resolution_var.get() == "<Add new>":
+                new_val = tk.simpledialog.askstring("Add Resolution", "Enter new resolution:", parent=self)
+                if new_val:
+                    if new_val not in self.resolution_choices:
+                        self.resolution_choices.append(new_val)
+                        self.resolution_choices.sort(key=lambda s: s.lower())
+                    resolution_combo['values'] = self.resolution_choices + ["<Add new>"]
+                    self.resolution_var.set(new_val)
+        resolution_combo.bind("<<ComboboxSelected>>", on_resolution_select)
 
     def handle_proceed(self):
         entry_type = self.entry_type_var.get()
@@ -874,8 +882,9 @@ class DataEntryWindow(tk.Toplevel):
                 self.reset_form_fields()
                 return
             else:
+                resolution = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else ''
                 self.db_ops.insert_music_video(title=self.title_var.get().strip(), release_date=perf_date,
-                                               file_path1=self.selected_local_files[0], file_url=None,
+                                               resolution=resolution if resolution else None, file_path1=self.selected_local_files[0], file_url=None,
                                                score=0, artist_names=artist_names,
                                                song_titles=song_titles)
                 messagebox.showinfo("Saved", f"Music Video '{self.title_var.get().strip()}' saved successfully.", parent=self)
@@ -1002,6 +1011,7 @@ class DataEntryWindow(tk.Toplevel):
                 if entry_type == "music_video":
                     # Insert Music Video record
                     self.db_ops.insert_music_video(
+                        resolution=None,
                         title=title,
                         release_date=perf_date,
                         file_path1=None,
@@ -1104,6 +1114,7 @@ class DataEntryWindow(tk.Toplevel):
                 return
             else:
                 self.db_ops.insert_music_video(title=title, release_date=perf_date,
+                                               resolution=None,
                                                file_path1=file_path1, file_url=None,
                                                score=0, artist_names=artist_names,
                                                song_titles=song_titles)
@@ -1513,9 +1524,11 @@ class DataEntryWindow(tk.Toplevel):
             try:
                 if entry_type == "music_video":
                     # Insert Music Video record
+                    resolution = self.resolution_var.get().strip() if hasattr(self, 'resolution_var') else ''
                     self.db_ops.insert_music_video(
                         title=title,
                         release_date=perf_date,
+                        resolution=resolution if resolution else None,
                         file_path1=None,
                         file_url=url,
                         score=0,
@@ -1616,6 +1629,7 @@ class DataEntryWindow(tk.Toplevel):
                 return
             else:
                 self.db_ops.insert_music_video(title=title, release_date=perf_date,
+                                               resolution=None,
                                                file_path1=file_path1, file_url=None,
                                                score=0, artist_names=artist_names,
                                                song_titles=song_titles)

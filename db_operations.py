@@ -116,7 +116,7 @@ def get_all_performances_raw():
         print(f"AttributeError in get_all_performances_raw (likely conn is None): {e}")
     return performances_raw
 
-def insert_music_video(title, release_date, file_path1=None, file_url=None, score=0, artist_names=None, song_titles=None):
+def insert_music_video(title, release_date, resolution=None, file_path1=None, file_url=None, score=0, artist_names=None, song_titles=None):
     if artist_names is None:
         artist_names = []
     if song_titles is None:
@@ -125,10 +125,10 @@ def insert_music_video(title, release_date, file_path1=None, file_url=None, scor
     # Compute Windows drive path for local file (file_path2)
     file_path2 = _get_windows_path(file_path1)
     cursor = conn.cursor()
-    # 1. Insert music video (including file_path1 and file_path2)
+    # 1. Insert music video (including file_path1, file_path2, and resolution)
     cursor.execute(
-        "INSERT INTO music_videos (title, release_date, file_path1, file_path2, file_url, score) VALUES (?, ?, ?, ?, ?, ?)",
-        (title, release_date, file_path1, file_path2, file_url, score)
+        "INSERT INTO music_videos (title, release_date, file_path1, file_path2, file_url, score, resolution) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (title, release_date, file_path1, file_path2, file_url, score, resolution)
     )
     mv_id = cursor.lastrowid
     # 2. Link artists
@@ -176,7 +176,7 @@ def get_all_music_videos_raw():
         return []
     query = """
         SELECT
-            mv.mv_id, mv.title, mv.release_date, mv.file_url, mv.file_path1, mv.file_path2, mv.score,
+            mv.mv_id, mv.title, mv.release_date, mv.resolution, mv.file_url, mv.file_path1, mv.file_path2, mv.score,
             (SELECT GROUP_CONCAT(a.artist_name, ', ')
              FROM artists a JOIN music_video_artist_link mval ON a.artist_id = mval.artist_id
              WHERE mval.mv_id = mv.mv_id ORDER BY mval.artist_order, a.artist_name) AS artists_concatenated,
@@ -328,7 +328,7 @@ def get_all_performance_ids():
         print(f"AttributeError in get_all_performance_ids (likely conn is None): {e}")
         return []
 
-def update_music_video(mv_id, title, release_date,
+def update_music_video(mv_id, title, release_date, resolution=None,
                        file_path1=None, file_path2=None, file_url=None, score=None,
                        artist_names=None, song_titles=None):
     """
@@ -340,10 +340,10 @@ def update_music_video(mv_id, title, release_date,
     cursor.execute(
         """
         UPDATE music_videos
-        SET title = ?, release_date = ?, file_path1 = ?, file_path2 = ?, file_url = ?, score = ?
+        SET title = ?, release_date = ?, resolution = ?, file_path1 = ?, file_path2 = ?, file_url = ?, score = ?
         WHERE mv_id = ?
         """,
-        (title, release_date, file_path1, file_path2, file_url, score, mv_id)
+        (title, release_date, resolution, file_path1, file_path2, file_url, score, mv_id)
     )
     # Refresh artist links
     cursor.execute("DELETE FROM music_video_artist_link WHERE mv_id = ?", (mv_id,))

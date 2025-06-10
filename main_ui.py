@@ -650,17 +650,18 @@ class KpopDBBrowser(tk.Tk):
             self.all_performances_data.append(perf_dict)
         # Process music videos
         for row in mv_rows:
+            # Row now: mv_id, title, release_date, resolution, file_url, file_path1, file_path2, score, artists, songs
             mv_dict = {
-                "performance_id": f"mv_{row[0]}",  # Unique ID for MVs
+                "performance_id": f"mv_{row[0]}",
                 "db_title": row[1] or "", "performance_date": row[2] or "N/A",
-                # Use file_path1 and file_path2 from the music_videos table
-                "file_path1": row[4] if len(row) > 4 else None,  # file_path1
-                "file_path2": row[5] if len(row) > 5 else None,  # file_path2
-                "file_url": row[3],
-                "score": row[6] if len(row) > 6 else None,
-                "show_type": "", "resolution": "",
-                "artists_str": row[7] if len(row) > 7 else (row[5] if len(row) > 5 else "N/A"),
-                "songs_str": row[8] if len(row) > 8 else (row[6] if len(row) > 6 else "N/A"),
+                "resolution": row[3] or "",
+                "file_url": row[4] if len(row) > 4 else None,
+                "file_path1": row[5] if len(row) > 5 else None,
+                "file_path2": row[6] if len(row) > 6 else None,
+                "score": row[7] if len(row) > 7 else None,
+                "show_type": "",
+                "artists_str": row[8] if len(row) > 8 else "N/A",
+                "songs_str": row[9] if len(row) > 9 else "N/A",
                 "entry_type": "mv"
             }
             # Fallback for legacy tuple length (if needed)
@@ -744,10 +745,10 @@ class KpopDBBrowser(tk.Tk):
             disp_date = perf_data.get("performance_date", "N/A")[:12]
             disp_artists = perf_data.get("artists_str", "N/A")
             disp_perf_title = perf_data.get("db_title", "N/A") 
-            # For MVs, leave show_type and resolution blank
+            # For MVs, show resolution; for performances, show show_type and resolution
             if perf_data.get("entry_type") == "mv":
                 disp_show_type = ""
-                disp_res = ""
+                disp_res = perf_data.get("resolution", "")[:8]
             else:
                 disp_show_type = perf_data.get("show_type", "N/A")
                 disp_res = perf_data.get("resolution", "N/A")[:8]
@@ -765,8 +766,8 @@ class KpopDBBrowser(tk.Tk):
             # Insert the entry and color music videos bright blue
             idx = self.listbox.size()
             self.listbox.insert(tk.END, display_string)
+            # Color music videos bright blue
             if perf_data.get("entry_type") == "mv":
-                # Bright blue for music video items
                 self.listbox.itemconfig(idx, fg="#8be9fd")
             
         self.status_var.set(f"{len(self.filtered_performances_data)} records match your filters.")
