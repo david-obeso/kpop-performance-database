@@ -667,12 +667,7 @@ class KpopDBBrowser(tk.Tk):
             # Fallback for legacy tuple length (if needed)
             # The line that copied file_url to file_path1 has been removed.
             # mv_dict["file_path1"] will now correctly be None if row[5] was None.
-            
-            # The following fallback for file_path2 might also need review,
-            # but is separate from the reported issue. It copies file_path1 (row[5]) to file_path2
-            # if file_path2 was None and file_path1 existed.
-            if mv_dict["file_path2"] is None and len(row) > 5 and isinstance(row[5], str) and row[5]: # Check if row[5] (db file_path1) is not empty
-                mv_dict["file_path2"] = row[5] # This copies actual file_path1 from DB to file_path2 if file_path2 is empty
+            # The redundant fallback copying file_path1 to file_path2 for MVs (if file_path2 was None) has been removed.
 
             path, is_yt = utils.get_playable_path_info(mv_dict)
             mv_dict["playable_path"] = path; mv_dict["is_youtube"] = is_yt
