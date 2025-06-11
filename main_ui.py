@@ -797,7 +797,7 @@ class KpopDBBrowser(tk.Tk):
                     
                     if is_yt:
                         youtube_urls_to_open.append(path_or_url)
-                    elif perf_dict.get("file_url"): 
+                    elif perf_dict.get("file_url") and not is_yt: 
                         skipped_items_info.append(f"Non-YouTube URL playback not directly supported: {path_or_url[:60]}...")
                         continue 
                     else: 
