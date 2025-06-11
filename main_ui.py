@@ -656,19 +656,24 @@ class KpopDBBrowser(tk.Tk):
                 "db_title": row[1] or "", "performance_date": row[2] or "N/A",
                 "resolution": row[3] or "",
                 "file_url": row[4] if len(row) > 4 else None,
-                "file_path1": row[5] if len(row) > 5 else None,
-                "file_path2": row[6] if len(row) > 6 else None,
+                "file_path1": row[5] if len(row) > 5 else None, # Ensures file_path1 is from DB
+                "file_path2": row[6] if len(row) > 6 else None, # Ensures file_path2 is from DB
                 "score": row[7] if len(row) > 7 else None,
-                "show_type": "",
+                "show_type": "", # MVs don't have show_type
                 "artists_str": row[8] if len(row) > 8 else "N/A",
                 "songs_str": row[9] if len(row) > 9 else "N/A",
                 "entry_type": "mv"
             }
             # Fallback for legacy tuple length (if needed)
-            if mv_dict["file_path1"] is None and len(row) > 4 and isinstance(row[4], str):
-                mv_dict["file_path1"] = row[4]
-            if mv_dict["file_path2"] is None and len(row) > 5 and isinstance(row[5], str):
-                mv_dict["file_path2"] = row[5]
+            # The line that copied file_url to file_path1 has been removed.
+            # mv_dict["file_path1"] will now correctly be None if row[5] was None.
+            
+            # The following fallback for file_path2 might also need review,
+            # but is separate from the reported issue. It copies file_path1 (row[5]) to file_path2
+            # if file_path2 was None and file_path1 existed.
+            if mv_dict["file_path2"] is None and len(row) > 5 and isinstance(row[5], str) and row[5]: # Check if row[5] (db file_path1) is not empty
+                mv_dict["file_path2"] = row[5] # This copies actual file_path1 from DB to file_path2 if file_path2 is empty
+
             path, is_yt = utils.get_playable_path_info(mv_dict)
             mv_dict["playable_path"] = path; mv_dict["is_youtube"] = is_yt
             self.all_performances_data.append(mv_dict)
