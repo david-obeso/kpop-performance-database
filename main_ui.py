@@ -789,25 +789,30 @@ class KpopDBBrowser(tk.Tk):
                 if 0 <= perf_idx < len(self.filtered_performances_data):
                     perf_dict = self.filtered_performances_data[perf_idx] 
                     path_or_url = perf_dict.get("playable_path")
-                    is_yt = perf_dict.get("is_youtube", False)
+                    # is_yt = perf_dict.get("is_youtube", False) # is_yt is no longer the primary condition for URL handling
 
                     if not path_or_url:
-                        name_info = f"{perf_dict.get('artists_str','N/A')} ({perf_dict.get('db_title','N/A')})"
+                        name_info = f"{perf_dict.get('artists_str', 'N/A')} ({perf_dict.get('db_title', 'N/A')})" # Corrected f-string
                         skipped_items_info.append(f"No path/URL for: {name_info}"); continue
                     
-                    if is_yt:
+                    # REVISED LOGIC:
+                    # If it has a file_url, treat as a web URL to open (YouTube or other).
+                    # Otherwise, if it has a playable_path (and no file_url), treat as a local file.
+                    # All items queued for playback are added to all_perf_details_for_callbacks.
+                    if perf_dict.get("file_url"): # Item is URL-based
                         youtube_urls_to_open.append(path_or_url)
-                    elif perf_dict.get("file_url") and not is_yt: 
-                        skipped_items_info.append(f"Non-YouTube URL playback not directly supported: {path_or_url[:60]}...")
-                        continue 
-                    else: 
-                        local_files_to_play.append(path_or_url)
-                    
-                    if is_yt or (not perf_dict.get("file_url") and path_or_url): 
                         all_perf_details_for_callbacks.append(perf_dict)
+                    elif path_or_url: # Item is path-based (local file), as file_url was false/None
+                        local_files_to_play.append(path_or_url)
+                        all_perf_details_for_callbacks.append(perf_dict)
+                    # The message "Non-YouTube URL playback not directly supported" is removed
+                    # as we now attempt to play them. The `is_yt` specific branching is also removed.
             except ValueError: print(f"Warning: Could not parse selection index: {index_str}")
         
         if skipped_items_info: 
+            # Update skipped message if non-YouTube URLs are now attempted
+            # For now, existing skipped_items_info for "No path/URL" is fine.
+            # If we want to inform about attempting non-YouTube URLs, that's a new message.
             messagebox.showwarning("Playback Warning", "Some items were skipped:\n- " + "\n- ".join(skipped_items_info), parent=self)
         
         if not local_files_to_play and not youtube_urls_to_open:
@@ -850,13 +855,19 @@ class KpopDBBrowser(tk.Tk):
 
         for perf_dict in chosen_perf_dicts:
             path_or_url = perf_dict.get("playable_path")
-            is_yt = perf_dict.get("is_youtube", False)
+            # is_yt = perf_dict.get("is_youtube", False) # This is no longer the primary condition for URL handling
+
             if not path_or_url: continue
 
-            if is_yt:
+            # REVISED LOGIC for play_random_videos:
+            # Consistent with the fix in play_selected.
+            # If it has a file_url, treat as a web URL to open (YouTube or other).
+            # Otherwise, if it has a playable_path (and no file_url), treat as a local file.
+            # All items queued for playback are added to all_perf_details_for_callbacks.
+            if perf_dict.get("file_url"): # Item is URL-based
                 youtube_urls_to_open.append(path_or_url)
                 all_perf_details_for_callbacks.append(perf_dict)
-            elif not perf_dict.get("file_url"): 
+            elif path_or_url: # Item is path-based (local file), as file_url was false/None
                 local_files_to_play.append(path_or_url)
                 all_perf_details_for_callbacks.append(perf_dict)
         
